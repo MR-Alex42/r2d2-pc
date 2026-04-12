@@ -282,7 +282,7 @@
                 const controlService = await server.getPrimaryService(API_V2_SERVICE);
                 controlChar = await controlService.getCharacteristic(API_V2_CHARACTERISTIC);
                 
-                // Setup Notifications for Sphero Responses (Fallback Battery)
+                // Setup Notifications for Sphero Responses
                 try {
                     const notifyChar = await controlService.getCharacteristic(API_V2_NOTIFY_CHARACTERISTIC);
                     await notifyChar.startNotifications();
@@ -350,25 +350,23 @@
         document.getElementById('disconnectBtn').addEventListener('click', async () => {
             try {
                 if (bluetoothDevice && bluetoothDevice.gatt.connected) {
-                    // Proper off-switching sequence
                     updateStatus("SHUTTING DOWN...", "text-yellow-500");
                     
                     // 1. Stop movement
                     sendDrive(0, Math.round(currentHeading));
                     
-                    // 2. Turn off all optical systems (Front, Rear, Logic, Holo)
+                    // 2. Turn off all optical systems
                     sendCmd(0x1A, 0x0E, [0x00, 0x07, 0, 0, 0]);
                     sendCmd(0x1A, 0x0E, [0x00, 0x70, 0, 0, 0]);
                     sendCmd(0x1A, 0x0E, [0x00, 0x08, 0]);
                     sendCmd(0x1A, 0x0E, [0x00, 0x80, 0]);
                     
-                    // 3. Send Sleep command (Power DID 0x13, Sleep CID 0x01)
+                    // 3. Send Sleep command
                     sendCmd(0x13, 0x01, [0x00, 0x00, 0x00, 0x00, 0x00]);
                     
-                    // Wait for the queue to process the shutdown commands before cutting connection
                     await new Promise(resolve => setTimeout(resolve, 800));
                     
-                    packetQueue = []; // Clear queue
+                    packetQueue = []; 
                     await bluetoothDevice.gatt.disconnect();
                 }
             } catch (error) {
@@ -437,22 +435,28 @@
                 const flags = unescaped[0];
                 const isResponse = (flags & 0x01) !== 0;
                 
+                // Advanced parsing: Sphero uses flags to indicate the presence of routing IDs.
+                // We MUST skip these to correctly align DID, CID, and payload offset.
+                let ptr = 1;
+                if ((flags & 0x08) !== 0) ptr++; // Skip Target ID
+                if ((flags & 0x10) !== 0) ptr++; // Skip Source ID
+                
                 if (isResponse) {
-                    const seq = unescaped[1];
-                    const err = unescaped[2];
-                    const req = pendingRequests[seq];
+                    const seq = unescaped[ptr++];
+                    const err = unescaped[ptr++];
+                    const data = unescaped.slice(ptr);
                     
+                    const req = pendingRequests[seq];
                     if (req && err === 0x00) {
-                        // Check if response is for Battery State (DID: 0x13, CID: 0x04)
-                        if (req.did === 0x13 && req.cid === 0x04 && unescaped.length > 3) {
-                            const state = unescaped[3];
+                        // Battery State Request
+                        if (req.did === 0x13 && req.cid === 0x04 && data.length > 0) {
+                            const state = data[0];
                             let stateStr = "OK";
                             if (state === 1) stateStr = "CHARGING";
                             else if (state === 2) stateStr = "OK";
                             else if (state === 3) stateStr = "LOW";
                             else if (state === 4) stateStr = "CRITICAL";
                             
-                            // Only update if standard BLE battery didn't already populate a %
                             const currentText = document.getElementById('batteryText').textContent;
                             if (!currentText.includes('%')) {
                                 updateBatteryUI(stateStr);
@@ -462,17 +466,17 @@
                     delete pendingRequests[seq];
                 } else {
                     // Async / Event Packet
-                    const did = unescaped[1];
-                    const cid = unescaped[2];
+                    const did = unescaped[ptr++];
+                    const cid = unescaped[ptr++];
+                    const seq = unescaped[ptr++]; // Sequence number is typically unused/echoed in async events
+                    const data = unescaped.slice(ptr);
                     
                     // Sensor Stream Data
                     if (did === 0x18 && cid === 0x02) {
-                        // Payload starts at unescaped[4]
-                        const payload = unescaped.slice(4);
-                        if (payload.length >= 6) {
-                            const view = new DataView(new Uint8Array(payload).buffer);
-                            // Mask 0x00070000 orders bits 18(Pitch), 17(Roll), 16(Yaw)
-                            const pitch = view.getInt16(0, false);
+                        if (data.length >= 6) {
+                            const view = new DataView(new Uint8Array(data).buffer);
+                            // Mask 0x00070000 streams Pitch, Roll, Yaw as 16-bit signed integers (-180 to +180)
+                            const pitch = view.getInt16(0, false); // False = Big Endian
                             const roll = view.getInt16(2, false);
                             const yaw = view.getInt16(4, false);
                             updateIMU(pitch, roll, yaw);
@@ -490,7 +494,6 @@
             if (!isConnected) return;
             if (ledThrottle[type]) clearTimeout(ledThrottle[type]);
             ledThrottle[type] = setTimeout(() => {
-                // Device 0x1A, Command 0x0E (setAllLEDs)
                 switch(type) {
                     case 'frontLogic':
                         const cf = document.getElementById('ledFrontLogic').value;
@@ -506,7 +509,6 @@
                         break;
                     case 'holoInt':
                         const hInt = parseInt(document.getElementById('ledHoloInt').value);
-                        // FIX: The Holo Projector specifically uses Bit 7 (0x80), not 0x70 which conflicts with the Rear LED.
                         sendCmd(0x1A, 0x0E, [0x00, 0x80, hInt]);
                         break;
                 }
@@ -521,9 +523,6 @@
         }
 
         function playSound(id) {
-            // FIX: Sphero audio commands require Big Endian format.
-            // Earlier Little Endian formatting caused the droid to look for non-existent IDs,
-            // resulting in immediate aborts (10th of a second clicks).
             const msb = (id >> 8) & 0xFF;
             const lsb = id & 0xFF;
             sendCmd(0x1A, 0x07, [msb, lsb, 0x00]);
