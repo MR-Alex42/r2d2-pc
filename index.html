@@ -304,10 +304,10 @@
       <div class="row">
         <span class="pill"><span id="statusDot" class="dot"></span><span id="statusText">Disconnected</span></span>
         <select id="scanMode" title="Bluetooth scan mode" style="max-width:240px">
-          <option value="r2d2" selected>Scan D2/R2 names</option>
+          <option value="r2d2">Scan D2/R2 names</option>
           <option value="starwars">Scan all Star Wars droids</option>
           <option value="service">Scan Sphero service UUID</option>
-          <option value="all">Show all BLE devices</option>
+          <option value="all" selected>Show all BLE devices</option>
         </select>
         <button id="connectBtn">Connect R2-D2</button>
         <button id="reconnectBtn" class="secondary">Reconnect remembered</button>
@@ -781,19 +781,21 @@
       connected: false,
       seq: 0,
       rxBuffer: [],
-      pending: new Map(),
-      txQueue: Promise.resolve(),
+      packetQueue: [],
+      isWriting: false,
       lastDrive: { speed: 0, heading: 0, flags: 0 },
       joystickActive: false,
       lastDriveSentAt: 0,
       keyboard: new Set(),
-      notify: { motorStall: false, battery: false, leg: false }
+      notify: { motorStall: false, battery: false, leg: false },
+      ledThrottle: {}
     };
 
     const $ = (id) => document.getElementById(id);
 
     function log(message, type = "") {
       const el = $("log");
+      if (!el) return;
       const ts = new Date().toLocaleTimeString();
       const prefix = type ? `[${type}] ` : "";
       el.textContent += `${ts} ${prefix}${message}\n`;
@@ -808,10 +810,10 @@
       $("reconnectBtn").disabled = connected;
       $("scanMode").disabled = connected;
       $("disconnectBtn").disabled = !connected;
+
       document.querySelectorAll("main button, main input, main select, main textarea").forEach((el) => {
         if (["clearLogBtn", "copyStateBtn"].includes(el.id)) return;
-        if (!connected && !["connectBtn", "reconnectBtn", "scanMode"].includes(el.id)) el.disabled = true;
-        if (connected) el.disabled = false;
+        el.disabled = !connected;
       });
     }
 
@@ -823,7 +825,7 @@
       $("connectBtn").disabled = false;
       $("reconnectBtn").disabled = false;
       $("scanMode").disabled = false;
-      $("
+      $("disconnectBtn").disabled = true;
     }
 
     function clamp(n, min, max) {
@@ -839,7 +841,7 @@
     }
 
     function toHex(bytes) {
-      return Array.from(bytes).map(b => Number(b).toString(16).padStart(2, "0").toUpperCase()).join(" ");
+      return Array.from(bytes || []).map(b => Number(b).toString(16).padStart(2, "0").toUpperCase()).join(" ");
     }
 
     function parseHexBytes(str) {
@@ -857,11 +859,6 @@
       return [(n >> 8) & 0xFF, n & 0xFF];
     }
 
-    function u32(n) {
-      n = Number(n) >>> 0;
-      return [(n >>> 24) & 0xFF, (n >>> 16) & 0xFF, (n >>> 8) & 0xFF, n & 0xFF];
-    }
-
     function f32be(value) {
       const buf = new ArrayBuffer(4);
       new DataView(buf).setFloat32(0, Number(value), false);
@@ -877,8 +874,8 @@
     }
 
     function checksum(body) {
-      const sum = body.reduce((acc, b) => (acc + b) & 0xFF, 0);
-      return sum ^ 0xFF;
+      const sum = body.reduce((acc, b) => (acc + (b & 0xFF)) & 0xFF, 0);
+      return (~sum) & 0xFF;
     }
 
     function encodeBody(body) {
@@ -887,7 +884,7 @@
         if (b === ESC) out.push(ESC, ESC_ESC);
         else if (b === SOP) out.push(ESC, ESC_SOP);
         else if (b === EOP) out.push(ESC, ESC_EOP);
-        else out.push(b);
+        else out.push(b & 0xFF);
       }
       return out;
     }
@@ -911,16 +908,14 @@
 
     function buildPacket(did, cid, payload = [], flags = 0x0A) {
       const seq = state.seq;
-      const body = [flags, did, cid, seq, ...payload.map(b => b & 0xFF)];
+      state.seq = (state.seq + 1) & 0xFF;
+      const body = [flags, did & 0xFF, cid & 0xFF, seq, ...payload.map(b => b & 0xFF)];
       body.push(checksum(body));
-      state.seq = (state.seq + 1) % 140;
-      return { seq, bytes: [SOP, ...encodeBody(body), EOP], body };
+      return { seq, bytes: new Uint8Array([SOP, ...encodeBody(body), EOP]), body };
     }
 
     function parseFrame(fullFrame) {
-      if (fullFrame[0] !== SOP || fullFrame[fullFrame.length - 1] !== EOP) {
-        return null;
-      }
+      if (!fullFrame.length || fullFrame[0] !== SOP || fullFrame[fullFrame.length - 1] !== EOP) return null;
       const body = decodeBody(fullFrame.slice(1, -1));
       if (body.length < 5) return null;
       const gotChk = body[body.length - 1];
@@ -929,13 +924,18 @@
       const did = body[1];
       const cid = body[2];
       const seq = body[3];
-
-      // Response packets typically include ERR after SEQ; async notifications often do not.
-      const looksLikeResponse = body.length >= 6 && seq !== 0xFF && (flags & 0x01) === 0;
-      const err = looksLikeResponse ? body[4] : null;
-      const data = body.slice(looksLikeResponse ? 5 : 4, -1);
-
+      const err = body.length >= 6 ? body[4] : null;
+      const data = body.slice(body.length >= 6 ? 5 : 4, -1);
       return { raw: fullFrame, body, flags, did, cid, seq, err, data, checksumOk: gotChk === calcChk };
     }
 
-    asyn
+    function buildRequestOptions() {
+      const optionalServices = [UUIDS.mainService, UUIDS.connectService];
+      const mode = $("scanMode")?.value || "all";
+
+      if (mode === "all") {
+        return { acceptAllDevices: true, optionalServices };
+      }
+
+      if (mode === "service") {
+        return { filters: [{ ser
