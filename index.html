@@ -17,7 +17,7 @@
 <section><div class="title">Optics <span class="hint">R2 LEDs</span></div><div class="grid2"><div><label>Front RGB</label><input type="color" id="ledFront" value="#00aaff"></div><div><label>Rear RGB</label><input type="color" id="ledRear" value="#ff0000"></div><div><label>Logic <span id="logicVal">255</span></label><input type="range" id="logicInt" min="0" max="255" value="255"></div><div><label>Holo <span id="holoVal">0</span></label><input type="range" id="holoInt" min="0" max="255" value="0"></div></div><div class="grid3" style="margin-top:6px"><button class="btn ghost" id="ledApplyBtn">Apply</button><button class="btn ghost" id="idleLedBtn">Idle LEDs</button><button class="btn red" id="ledOffBtn">Off</button></div></section>
 <section><div class="title">Audio <span class="hint">all IDs via raw field</span></div><div class="grid2"><select id="soundSelect"></select><input id="soundId" type="number" min="0" max="65535" value="1950" title="Any Sphero sound ID"></div><div class="grid3" style="margin-top:5px"><button class="btn pink" id="playSoundBtn">Play List</button><button class="btn pink" id="playSoundIdBtn">Play ID</button><button class="btn red" id="stopAudioBtn">Stop</button></div><div style="margin-top:5px"><label>Volume <span id="volLabel">50%</span></label><input id="masterVolume" type="range" min="0" max="255" value="128"></div></section>
 <section><div class="title">Routines <span class="hint">animations</span></div><div class="row"><select id="animSelect" class="grow"></select><button class="btn blue" id="playAnimBtn">Play</button><button class="btn red" id="stopAnimBtn">Stop</button></div><div class="grid3" style="margin-top:6px"><button class="btn ghost" id="idleOnBtn">Idle On</button><button class="btn ghost" id="idleOffBtn">Idle Off</button><button class="btn ghost" id="trophyBtn">Trophy</button></div></section>
-<section><div class="title">Telemetry <span class="hint">safe IMU toggle</span></div><div class="grid4"><button class="btn ghost" id="imuBtn">IMU</button><button class="btn ghost" id="batteryBtn">Battery</button><button class="btn ghost" id="voltageBtn">Voltage</button><button class="btn ghost" id="wakeBtn">Wake</button></div><div class="grid4" style="margin-top:6px"><div class="metric">Pitch<b id="imuPitch">0°</b></div><div class="metric">Roll<b id="imuRoll">0°</b></div><div class="metric">Yaw<b id="imuYaw">0°</b></div><div class="metric">Head<b id="headOut">--</b></div></div></section>
+<section><div class="title">Telemetry <span class="hint" id="telemetryHint">battery + IMU probe</span></div><div class="grid4"><button class="btn ghost" id="imuBtn">IMU Probe</button><button class="btn ghost" id="batteryBtn">Battery</button><button class="btn ghost" id="voltageBtn">Voltage</button><button class="btn ghost" id="wakeBtn">Wake</button></div><div class="grid4" style="margin-top:6px"><div class="metric">Pitch<b id="imuPitch">0°</b></div><div class="metric">Roll<b id="imuRoll">0°</b></div><div class="metric">Yaw<b id="imuYaw">0°</b></div><div class="metric">State<b id="imuState">Idle</b></div></div></section>
 <section><div class="title">Expert <span class="hint">raw/stabilization</span></div><div class="grid3"><button class="btn ghost" id="stabBtn">Stab</button><button class="btn red" id="rawAllOffBtn">Raw Off</button><button class="btn red" id="sleepBtn">Sleep</button></div><div class="row" style="margin-top:6px"><input id="rawCmd" class="grow" type="text" placeholder="DID CID DATA, ex: 1A 07 06 49 00"><button class="btn amber" id="rawCmdBtn">Send</button></div></section>
 <section class="span2"><div class="title">Event Log <span class="hint">Boot OK means JS loaded</span></div><div id="eventLog" class="log"></div></section>
 </main><footer class="tiny">Use Chrome/Edge. Save as .html or serve from HTTPS/localhost. STOP before lifting the droid.</footer></div>
@@ -31,6 +31,7 @@ const API_V2_NOTIFY_CHARACTERISTIC='00010003'+SPHERO_UUID_BASE;
 const ANTI_DOS_SERVICE='00020001'+SPHERO_UUID_BASE;
 const ANTI_DOS_CHARACTERISTIC='00020005'+SPHERO_UUID_BASE;
 let bluetoothDevice=null,controlChar=null,notifyChar=null,isConnected=false,seqNum=0,packetQueue=[],isWriting=false,pendingRequests=new Map();
+const notificationCharIds=new Set();
 let currentSpeed=0,currentHeading=0,lastSpeed=-1,lastHeading=-1,isJoystickActive=false,keys={up:false,down:false,left:false,right:false},imuEnabled=false,trophyEnabled=false;
 let imuFrameCount=0,lastImuFrameAt=0,lastNotifyLogAt=0;
 const $=id=>document.getElementById(id),clamp=(v,min,max)=>Math.max(min,Math.min(max,v)),sleep=ms=>new Promise(r=>setTimeout(r,ms)),logEl=$('eventLog');
@@ -63,7 +64,39 @@ function sendCmdNoResponse(did,cid,data=[],label=''){
   log('TX no-response '+label+' DID 0x'+did.toString(16)+' CID 0x'+cid.toString(16)+' data '+bytesToHex(data));
   return enqueuePacket(0x08,did,cid,seq,data,label,false);
 }
-$('connectBtn').addEventListener('click',async()=>{try{if(!navigator.bluetooth)throw new Error('Web Bluetooth unavailable in this browser/context.');status('scanning...','warn');bluetoothDevice=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[API_V2_SERVICE,ANTI_DOS_SERVICE,'battery_service']});bluetoothDevice.addEventListener('gattserverdisconnected',onDisconnected);const server=await bluetoothDevice.gatt.connect();status('anti-DOS handshake...','warn');const anti=await server.getPrimaryService(ANTI_DOS_SERVICE);const antiChar=await anti.getCharacteristic(ANTI_DOS_CHARACTERISTIC);await antiChar.writeValueWithResponse(new TextEncoder().encode('usetheforce...band'));const api=await server.getPrimaryService(API_V2_SERVICE);controlChar=await api.getCharacteristic(API_V2_CHARACTERISTIC);try{notifyChar=await api.getCharacteristic(API_V2_NOTIFY_CHARACTERISTIC);await notifyChar.startNotifications();notifyChar.addEventListener('characteristicvaluechanged',handleResponse);log('API notifications enabled.')}catch(e){log('API notify unavailable: '+e.message,'warn')}try{const bs=await server.getPrimaryService('battery_service');const bc=await bs.getCharacteristic('battery_level');const v=await bc.readValue();updateBattery(v.getUint8(0)+'%');await bc.startNotifications();bc.addEventListener('characteristicvaluechanged',e=>updateBattery(e.target.value.getUint8(0)+'%'))}catch(e){log('Standard battery service unavailable; using Sphero battery commands.')}isConnected=true;setOnline(true);status('LINK ONLINE','good');log('Connected to '+(bluetoothDevice.name||'Sphero droid'));sendCmd(0x13,0x0D,[],'wake');await sleep(300);applyAllLights();updateVolume($('masterVolume').value);requestBattery()}catch(e){status('error: '+e.message,'bad');log('Connect error: '+e.message,'bad')}});
+async function startNotifyOnChar(ch,label){
+  try{
+    const id=ch.uuid.toLowerCase();
+    if(notificationCharIds.has(id))return false;
+    const p=ch.properties;
+    if(!p.notify&&!p.indicate)return false;
+    await ch.startNotifications();
+    ch.addEventListener('characteristicvaluechanged',handleResponse);
+    notificationCharIds.add(id);
+    log('Notifications enabled on '+label+' '+id,'good');
+    return true;
+  }catch(e){
+    log('Notify start failed on '+label+': '+e.message,'warn');
+    return false;
+  }
+}
+async function startAllApiNotifications(apiService){
+  notificationCharIds.clear();
+  let count=0;
+  try{
+    notifyChar=await apiService.getCharacteristic(API_V2_NOTIFY_CHARACTERISTIC);
+    if(await startNotifyOnChar(notifyChar,'API notify'))count++;
+  }catch(e){log('API notify characteristic lookup failed: '+e.message,'warn')}
+  if(controlChar&&await startNotifyOnChar(controlChar,'API control'))count++;
+  try{
+    const chars=await apiService.getCharacteristics();
+    for(const ch of chars){
+      if(await startNotifyOnChar(ch,'API service'))count++;
+    }
+  }catch(e){log('API characteristic scan failed: '+e.message,'warn')}
+  log('API notification subscriptions active: '+count,'good');
+}
+$('connectBtn').addEventListener('click',async()=>{try{if(!navigator.bluetooth)throw new Error('Web Bluetooth unavailable in this browser/context.');status('scanning...','warn');bluetoothDevice=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[API_V2_SERVICE,ANTI_DOS_SERVICE,'battery_service']});bluetoothDevice.addEventListener('gattserverdisconnected',onDisconnected);const server=await bluetoothDevice.gatt.connect();status('anti-DOS handshake...','warn');const anti=await server.getPrimaryService(ANTI_DOS_SERVICE);const antiChar=await anti.getCharacteristic(ANTI_DOS_CHARACTERISTIC);await antiChar.writeValueWithResponse(new TextEncoder().encode('usetheforce...band'));const api=await server.getPrimaryService(API_V2_SERVICE);controlChar=await api.getCharacteristic(API_V2_CHARACTERISTIC);await startAllApiNotifications(api);try{const bs=await server.getPrimaryService('battery_service');const bc=await bs.getCharacteristic('battery_level');const v=await bc.readValue();updateBattery(v.getUint8(0)+'%');await bc.startNotifications();bc.addEventListener('characteristicvaluechanged',e=>updateBattery(e.target.value.getUint8(0)+'%'))}catch(e){log('Standard battery service unavailable; using Sphero battery commands.')}isConnected=true;setOnline(true);status('LINK ONLINE','good');log('Connected to '+(bluetoothDevice.name||'Sphero droid'));sendCmd(0x13,0x0D,[],'wake');await sleep(300);applyAllLights();updateVolume($('masterVolume').value);requestBattery()}catch(e){status('error: '+e.message,'bad');log('Connect error: '+e.message,'bad')}});
 $('disconnectBtn').onclick=async()=>{try{if(isConnected){emergencyStop();lightsOff();stopAudio();stopAnimation();await sleep(150);sendCmd(0x13,0x01,[0,0,0,0,0],'sleep');await sleep(300)}if(bluetoothDevice?.gatt?.connected)await bluetoothDevice.gatt.disconnect()}catch(e){log('Disconnect error: '+e.message,'bad')}finally{onDisconnected()}};
 function onDisconnected(){isConnected=false;controlChar=null;notifyChar=null;packetQueue=[];pendingRequests.clear();setOnline(false);status('OFFLINE','bad');updateBattery('--');imuEnabled=false;log('Disconnected.')}
 function handleResponse(e){
@@ -133,7 +166,16 @@ function parseImuPayload(data,source){
 function scanForImuFrame(body){
   for(let i=0;i<body.length-2;i++){
     if(body[i]===0x18&&body[i+1]===0x02){
-      if(parseImuPayload(body.slice(i+2),'scan'))return true;
+      if(parseImuPayload(body.slice(i+2),'sensor notify scan'))return true;
+    }
+  }
+  // Last-resort parser: some Sphero firmware routes the data-stream packet without DID/CID
+  // in the place the public docs imply. Try float32 triples at each byte offset.
+  for(let i=0;i<body.length-11;i++){
+    const slice=body.slice(i);
+    if(slice.length>=12){
+      const usable=slice.slice(0,Math.floor(slice.length/4)*4);
+      if(parseImuPayload(usable,'raw notify offset '+i))return true;
     }
   }
   return false;
@@ -178,7 +220,8 @@ function setTrophyMode(enable){
     sendCmd(0x17,0x2C,[1],'idle animations on for trophy');
     sendCmd(0x1A,0x19,[],'idle LED animation for trophy');
     setTimeout(()=>playAnimation(25),220);
-    log('Trophy ON requested; also played IDLE 1 as visible confirmation.');
+    setTimeout(()=>playSound(3302),420); // R2_POSITIVE_1: audible confirmation for boss demo
+    log('Trophy ON requested; played IDLE 1 plus R2_POSITIVE_1 sound.');
   }else{
     sendCmd(0x17,0x2C,[0],'idle animations off for trophy');
     log('Trophy OFF requested.');
@@ -187,46 +230,67 @@ function setTrophyMode(enable){
 $('trophyBtn').onclick=()=>setTrophyMode(!trophyEnabled);
 function requestBattery(){sendCmd(0x13,0x04,[],'battery state');sendCmd(0x13,0x10,[],'battery percent')}
 $('batteryBtn').onclick=requestBattery;$('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');$('wakeBtn').onclick=()=>sendCmd(0x13,0x0D,[],'wake');
-let imuRetryTimer=null;
+let imuRetryTimer=null, imuUnsupportedTimer=null;
+function setImuDisplayState(state,cls=''){
+  const el=$('imuState'); if(el){el.textContent=state; el.className=cls;}
+  const hint=$('telemetryHint'); if(hint)hint.textContent=state;
+}
 function setSensorMask(mask,label,interval=100){
   const data=[(interval>>8)&255,interval&255,0,(mask>>>24)&255,(mask>>>16)&255,(mask>>>8)&255,mask&255];
   sendCmd(0x18,0x00,data,label+' response');
-  setTimeout(()=>sendCmdNoResponse(0x18,0x00,data,label+' fire'),60);
+  setTimeout(()=>sendCmdNoResponse(0x18,0x00,data,label+' fire'),90);
 }
 function stopAllSensorStreams(){
+  // Keep this conservative: some R2-D2 firmware ignores unsupported streaming-service commands.
   sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'legacy IMU off');
   sendCmd(0x18,0x0C,[0,0,0,0],'extended IMU off');
-  sendCmd(0x18,0x3B,[],'streaming service stop');
-  sendCmd(0x18,0x3C,[],'streaming service clear');
+}
+function enableActivityDiagnostics(){
+  // These are not continuous IMU, but they prove whether the sensor/notify path can emit anything.
+  sendCmd(0x18,0x18,float32Bytes(0.01),'accel activity threshold');
+  setTimeout(()=>sendCmd(0x18,0x19,[1],'accel activity notify on'),120);
+  setTimeout(()=>sendCmd(0x18,0x1B,float32Bytes(10),'gyro activity threshold'),240);
+  setTimeout(()=>sendCmd(0x18,0x1C,[1],'gyro activity notify on'),360);
+  setTimeout(()=>sendCmd(0x18,0x0F,[1],'gyro max notify on'),480);
 }
 function startImuStreaming(){
   imuEnabled=true;imuFrameCount=0;lastImuFrameAt=0;lastNotifyLogAt=0;
-  clearTimeout(imuRetryTimer);
+  clearTimeout(imuRetryTimer);clearTimeout(imuUnsupportedTimer);
+  $('imuPitch').textContent='…';$('imuRoll').textContent='…';$('imuYaw').textContent='…';
+  setImuDisplayState('Probing','warn');
   sendCmd(0x13,0x0D,[],'wake before IMU');
   stopAllSensorStreams();
   setTimeout(()=>{
-    // 0x00070000 = attitude pitch/roll/yaw. Add accel-one/core-time to make some firmwares actually emit frames.
-    setSensorMask(0x00070202,'IMU attitude+accelOne+time',100);
-    // Extended gyro mask documented on R2-D2/BB-9E: x/y/z = 0x03800000.
+    // Official v2 stream mask path: attitude pitch/roll/yaw = 0x00070000.
+    setSensorMask(0x00070000,'IMU attitude v2',250);
     sendCmd(0x18,0x0C,[0x03,0x80,0x00,0x00],'extended gyro mask');
-    setTimeout(()=>sendCmd(0x18,0x01,[],'get IMU mask'),250);
-    setTimeout(()=>sendCmd(0x18,0x0D,[],'get extended mask'),320);
-  },180);
+
+    // Legacy-compatible data streaming path also exposed in Sphero APIs:
+    // interval u16, samples-per-packet u16, mask u32, count u8, extended-mask u32.
+    sendCmd(0x02,0x11,[0x00,0x64,0x00,0x01,0x00,0x07,0x00,0x00,0x00,0x00,0x00,0x00,0x00],'legacy set_data_streaming attitude');
+
+    enableActivityDiagnostics();
+    setTimeout(()=>sendCmd(0x18,0x01,[],'get IMU mask'),400);
+    setTimeout(()=>sendCmd(0x18,0x0D,[],'get extended mask'),520);
+  },300);
   imuRetryTimer=setTimeout(()=>{
     if(!imuEnabled||imuFrameCount>0)return;
-    log('No attitude frames yet; retrying with accelerometer-only mask 0x0000E000.','warn');
-    setSensorMask(0x0000E000,'IMU accel fallback',100);
-  },2200);
-  imuRetryTimer=setTimeout(()=>{
+    setImuDisplayState('No stream','warn');
+    log('No IMU stream yet. Trying accelerometer-only v2 mask 0x0000E000.','warn');
+    setSensorMask(0x0000E000,'IMU accel fallback',250);
+  },2600);
+  imuUnsupportedTimer=setTimeout(()=>{
     if(!imuEnabled||imuFrameCount>0)return;
-    log('Still no sensor frames. BLE notifications work only if Notify RX appears; if none appears, firmware is accepting commands but not emitting sensor async packets.','warn');
-  },4500);
-  log('IMU requested with attitude mask, extended gyro mask, and retry fallback. Watch for Notify RX or IMU frame #1.');
+    setImuDisplayState('Waiting','warn');
+    log('Still waiting for IMU frames. Keep this probe running and tilt/drive the droid. If the log shows no Notify RX after the new all-characteristic subscription, the remaining issue is notification routing, not the IMU mask.','warn');
+  },6200);
+  log('IMU probe started. If the firmware supports streaming, you will see Notify RX and IMU frame #1.');
 }
 function stopImuStreaming(){
-  imuEnabled=false;clearTimeout(imuRetryTimer);stopAllSensorStreams();
+  imuEnabled=false;clearTimeout(imuRetryTimer);clearTimeout(imuUnsupportedTimer);stopAllSensorStreams();
   $('imuPitch').textContent='0°';$('imuRoll').textContent='0°';$('imuYaw').textContent='0°';
-  log('IMU stopped and stream masks cleared.');
+  setImuDisplayState('Idle');
+  log('IMU probe stopped and stream masks cleared.');
 }
 $('imuBtn').onclick=()=>{if(imuEnabled)stopImuStreaming();else startImuStreaming();};
 $('stabBtn').onclick=()=>sendCmd(0x16,0x0C,[1],'stabilization');$('sleepBtn').onclick=()=>sendCmd(0x13,0x01,[0,0,0,0,0],'sleep');$('rawAllOffBtn').onclick=()=>{for(let i=0;i<4;i++)sendCmd(0x16,0x0B,[i,0,0,0],'raw off')};$('rawCmdBtn').onclick=()=>{const a=parseHex($('rawCmd').value);if(a.length<2){log('Raw command needs DID CID [DATA...]','bad');return}sendCmd(a[0],a[1],a.slice(2),'raw user')};
