@@ -262,14 +262,33 @@ function parseResponse(req, data) {
   else if (req.did===0x13 && req.cid===0x10 && data.length) { updateBattery(data[0]+'%'); log('Battery percent: '+data[0]+'%'); }
   else if (req.did===0x17 && req.cid===0x14 && data.length>=4) { const v=view.getFloat32(0,false); $('headOut').textContent=v.toFixed(1)+'°'; $('headVal').textContent=Math.round(v)+'°'; $('headSlider').value=clamp(v,-180,180); }
   else if (req.did===0x17 && req.cid===0x16 && data.length>=4) { const v=view.getFloat32(0,false); $('legPosVal').textContent=v.toFixed(2); $('legPosSlider').value=clamp(v,0,1); }
+  else if (req.did===0x18 && req.cid===0x01 && data.length>=7) { log(`Sensor mask: interval=${(data[0]<<8)|data[1]}ms count=${data[2]} mask=0x${((data[3]<<24)|(data[4]<<16)|(data[5]<<8)|data[6]).toString(16).padStart(8,'0')}`); }
   else if (req.label) log(`OK ${req.label}: ${bytesToHex(data)}`);
+}
+function parseFloat32List(data) {
+  const dv = new DataView(new Uint8Array(data).buffer);
+  const out = [];
+  for (let i = 0; i + 3 < data.length; i += 4) out.push(dv.getFloat32(i, false));
+  return out;
 }
 function parseAsync(did, cid, data) {
   if (did===0x18 && cid===0x02) {
-    if (data.length >= 6) {
+    // R2-D2/BB-9E v2 sensor streaming emits big-endian float32 values.
+    // The old Sphero v1 stream used int16 attitude values, so keep a fallback for odd firmware/packet variants.
+    if (data.length >= 12 && data.length % 4 === 0) {
+      const vals = parseFloat32List(data);
+      const pitch = vals[0] ?? 0, roll = vals[1] ?? 0, yaw = vals[2] ?? 0;
+      $('imuPitch').textContent = pitch.toFixed(1) + '°';
+      $('imuRoll').textContent = roll.toFixed(1) + '°';
+      $('imuYaw').textContent = yaw.toFixed(1) + '°';
+      if (Math.random() < 0.04) log(`IMU float frame: ${vals.slice(0,3).map(v=>v.toFixed(2)).join(', ')}`);
+    } else if (data.length >= 6) {
       const dv = new DataView(new Uint8Array(data).buffer);
       const pitch = dv.getInt16(0,false), roll = dv.getInt16(2,false), yaw = dv.getInt16(4,false);
       $('imuPitch').textContent = pitch + '°'; $('imuRoll').textContent = roll + '°'; $('imuYaw').textContent = yaw + '°';
+      log('IMU int16 fallback frame: ' + bytesToHex(data));
+    } else {
+      log('IMU frame too short: ' + bytesToHex(data), 'warn');
     }
   } else if (did===0x18 && cid===0x12) log('Collision: ' + bytesToHex(data), 'warn');
   else if (did===0x17 && cid===0x26) log('Leg action complete.', 'good');
@@ -322,7 +341,12 @@ $('trophyBtn').onclick=()=>{ trophyEnabled=!trophyEnabled; sendCmd(0x17,0x2D,[tr
 
 function requestBattery(){ sendCmd(0x13,0x04,[],'battery state'); sendCmd(0x13,0x10,[],'battery percent'); }
 $('batteryBtn').onclick=requestBattery; $('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');
-$('imuBtn').onclick=()=>{ imuEnabled=!imuEnabled; if(imuEnabled) sendCmd(0x18,0x00,[0x00,0xFA,0x00,0x00,0x07,0x00,0x00],'IMU on'); else {sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'IMU off'); $('imuPitch').textContent='0°';$('imuRoll').textContent='0°';$('imuYaw').textContent='0°';} };
+$('imuBtn').onclick=()=>{
+  imuEnabled=!imuEnabled;
+  if(imuEnabled) {
+    // Sensor DID 0x18 / CID 0x00: interval u16, count u8, mask u32.
+    // Mask 0x00070000 = attitude pitch/roll/yaw on BB-9E/R2-D2-family toys.
+    sendCmd(0x18,0x00,[0x00,0xFA,0x00,0x00,0x07,0x00,0x00],'IMU attitude stream
 $('collisionBtn').onclick=()=>{ collisionEnabled=!collisionEnabled; if(collisionEnabled){ sendCmd(0x18,0x11,[1,80,80,40,40,80],'configure collision'); sendCmd(0x18,0x14,[1],'collision on'); } else sendCmd(0x18,0x14,[0],'collision off'); };
 $('stabBtn').onclick=()=>sendCmd(0x16,0x0C,[+$('stabSelect').value],'stabilization');
 $('rawSendBtn').onclick=()=>sendCmd(0x16,0x0B,[+$('rawIndex').value,+$('rawMode').value,0,+$('rawSpeed').value],'raw motor');
@@ -714,77 +738,4 @@ R2_POSITIVE_18,3375
 R2_POSITIVE_19,3388
 R2_POSITIVE_2,3394
 R2_POSITIVE_20,3403
-R2_POSITIVE_21,3410
-R2_POSITIVE_22,3422
-R2_POSITIVE_23,3434
-R2_POSITIVE_3,3439
-R2_POSITIVE_4,3446
-R2_POSITIVE_5,3449
-R2_POSITIVE_6,3454
-R2_POSITIVE_7,3460
-R2_POSITIVE_8,3471
-R2_POSITIVE_9,3478
-R2_SAD_1,3484
-R2_SAD_10,3495
-R2_SAD_11,3518
-R2_SAD_12,3526
-R2_SAD_13,3536
-R2_SAD_14,3543
-R2_SAD_15,3553
-R2_SAD_16,3561
-R2_SAD_17,3570
-R2_SAD_18,3593
-R2_SAD_19,3600
-R2_SAD_2,3608
-R2_SAD_20,3612
-R2_SAD_21,3619
-R2_SAD_22,3632
-R2_SAD_23,3639
-R2_SAD_24,3649
-R2_SAD_25,3661
-R2_SAD_3,3686
-R2_SAD_4,3693
-R2_SAD_5,3703
-R2_SAD_6,3739
-R2_SAD_7,3755
-R2_SAD_8,3782
-R2_SAD_9,3790
-R2_SCREAM,3797
-R2_SCREAM_2,3810
-R2_SHORT_OUT,3825
-R2Q5_ALARM_1,3864
-R2Q5_ALARM_2,3869
-R2Q5_CHATTY_1,3875
-R2Q5_CHATTY_2,3891
-R2Q5_HEY_1,3896
-R2Q5_HEY_2,3901
-R2Q5_NEGATIVE_1,3907
-R2Q5_POSITIVE_1,3914
-R2Q5_POSITIVE_2,3920
-R2Q5_SAD_1,3925
-R2Q5_SHUTDOWN,3929
-BB9E_EXTRA_1,3941
-BB9E_EXTRA_2,4021
-BB9E_EXTRA_3,4246
-BB9E_EXTRA_4,4568
-BB9E_EXTRA_5,4929
-BB9E_EXTRA_6,5156
-BB9E_EXTRA_7,5315
-BB9E_HEAD_TURN_1,5441
-BB9E_HEAD_TURN_2,5483
-BB9E_HEAD_TURN_3,5513`;
-
-const parseCsv = s => s.trim().split(/\n+/).map(line => { const [name,id]=line.split(','); return {name:name.trim(), id:+id, group:name.split('_')[1]||name, droid:name.startsWith('R2Q5')?'R2Q5':name.startsWith('R2_')?'R2':name.startsWith('BB9E')?'BB9E':name.startsWith('BB8')?'BB8':name.startsWith('TEST')?'TEST':'OTHER'}; });
-const sounds = parseCsv(SOUND_CSV), anims = parseCsv(ANIMS);
-function fillSelect(sel, rows, formatter){ sel.innerHTML=''; rows.forEach(o=>{ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=formatter?formatter(o):`${o.name.replace(/_/g,' ')} · ${o.id}`; sel.appendChild(opt); }); }
-function refreshSoundFilters(){ const moods=[...new Set(sounds.map(s=>s.group))].sort(); $('soundMood').innerHTML='<option value="">All groups</option>'+moods.map(m=>`<option>${m}</option>`).join(''); }
-function refreshSounds(){ const d=$('soundDroid').value, m=$('soundMood').value, q=$('soundFilter').value.toLowerCase(); const rows=sounds.filter(s=>(!d||s.droid===d)&&(!m||s.group===m)&&(!q||s.name.toLowerCase().includes(q)||String(s.id).includes(q))); fillSelect($('soundSelect'), rows); $('soundCount').textContent=`${rows.length}/${sounds.length} sounds`; }
-['soundDroid','soundMood','soundFilter'].forEach(id=>$(id).addEventListener('input', refreshSounds));
-fillSelect($('animSelect'), anims, o=>`${o.name.replace(/_/g,' ')} · ${o.id}`); refreshSoundFilters(); refreshSounds();
-
-setInterval(()=>{ if(isConnected && currentSpeed>0) sendDrive(currentSpeed,currentHeading); },500);
-setInterval(()=>{ if(isConnected) requestBattery(); },30000);
-log('Ready. Connect your droid, then use STOP if anything feels wrong.');
-</script>
-</body>
-</html>
+R2
