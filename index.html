@@ -1,943 +1,790 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sphero R2-D2 Web Bluetooth Controller</title>
-  <style>
-    :root {
-      --bg: #07111f;
-      --panel: #0d1c31;
-      --panel-2: #102642;
-      --text: #eaf4ff;
-      --muted: #9db2cb;
-      --accent: #55c7ff;
-      --accent-2: #ffdd62;
-      --danger: #ff6378;
-      --ok: #54d98c;
-      --line: rgba(255,255,255,.12);
-      --shadow: 0 20px 60px rgba(0,0,0,.35);
-      --radius: 18px;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(85,199,255,.25), transparent 32rem),
-        radial-gradient(circle at bottom right, rgba(255,221,98,.16), transparent 28rem),
-        var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
-
-    header {
-      position: sticky;
-      top: 0;
-      z-index: 5;
-      backdrop-filter: blur(18px);
-      background: rgba(7, 17, 31, .82);
-      border-bottom: 1px solid var(--line);
-    }
-
-    .wrap {
-      width: min(1440px, calc(100% - 28px));
-      margin: 0 auto;
-    }
-
-    .hero {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 18px 0;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(1.35rem, 2.8vw, 2.6rem);
-      letter-spacing: -.04em;
-    }
-
-    .subtitle {
-      color: var(--muted);
-      margin-top: 4px;
-      font-size: .95rem;
-    }
-
-    main {
-      padding: 22px 0 60px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 16px;
-    }
-
-    .card {
-      grid-column: span 4;
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.025));
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 16px;
-      box-shadow: var(--shadow);
-    }
-
-    .wide { grid-column: span 8; }
-    .full { grid-column: 1 / -1; }
-    .half { grid-column: span 6; }
-
-    @media (max-width: 1100px) {
-      .card, .wide, .half { grid-column: 1 / -1; }
-      .hero { align-items: flex-start; flex-direction: column; }
-    }
-
-    .card h2 {
-      margin: 0 0 12px;
-      font-size: 1.05rem;
-      letter-spacing: -.015em;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      border: 1px solid var(--line);
-      padding: 8px 11px;
-      border-radius: 999px;
-      color: var(--muted);
-      background: rgba(255,255,255,.04);
-      font-size: .9rem;
-      white-space: nowrap;
-    }
-
-    .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      background: var(--danger);
-      box-shadow: 0 0 0 4px rgba(255,99,120,.12);
-    }
-
-    .dot.ok { background: var(--ok); box-shadow: 0 0 0 4px rgba(84,217,140,.12); }
-
-    button, input, select, textarea {
-      font: inherit;
-    }
-
-    button {
-      border: 0;
-      color: #041220;
-      background: var(--accent);
-      border-radius: 14px;
-      padding: 10px 13px;
-      font-weight: 750;
-      cursor: pointer;
-      transition: transform .08s ease, opacity .15s ease, filter .15s ease;
-      min-height: 42px;
-    }
-
-    button:hover { filter: brightness(1.06); }
-    button:active { transform: translateY(1px) scale(.99); }
-    button.secondary { background: rgba(255,255,255,.08); color: var(--text); border: 1px solid var(--line); }
-    button.warn { background: var(--accent-2); }
-    button.danger { background: var(--danger); color: #fff; }
-    button.ok { background: var(--ok); }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .row + .row { margin-top: 10px; }
-
-    label {
-      display: grid;
-      gap: 6px;
-      color: var(--muted);
-      font-size: .88rem;
-      min-width: 120px;
-      flex: 1;
-    }
-
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
-
-    input[type="number"], input[type="text"], select, textarea, input[type="color"] {
-      width: 100%;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      background: rgba(0,0,0,.22);
-      color: var(--text);
-      padding: 10px 11px;
-      min-height: 42px;
-    }
-
-    textarea {
-      min-height: 84px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: .9rem;
-      resize: vertical;
-    }
-
-    input[type="color"] { padding: 4px; }
-
-    .readout {
-      color: var(--text);
-      font-weight: 800;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .muted { color: var(--muted); }
-    .tiny { font-size: .82rem; line-height: 1.45; }
-
-    .kbd {
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,.06);
-      border-radius: 7px;
-      padding: 1px 6px;
-      color: var(--text);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: .8rem;
-    }
-
-    .joystickBox {
-      display: grid;
-      place-items: center;
-      padding: 14px;
-    }
-
-    .joystick {
-      width: min(320px, 72vw);
-      aspect-ratio: 1;
-      border-radius: 999px;
-      border: 1px solid rgba(85,199,255,.35);
-      background:
-        linear-gradient(90deg, transparent calc(50% - 1px), rgba(255,255,255,.14), transparent calc(50% + 1px)),
-        linear-gradient(transparent calc(50% - 1px), rgba(255,255,255,.14), transparent calc(50% + 1px)),
-        radial-gradient(circle, rgba(85,199,255,.2) 0 10%, rgba(85,199,255,.08) 11% 56%, rgba(255,255,255,.06) 57% 100%);
-      position: relative;
-      touch-action: none;
-      box-shadow: inset 0 0 40px rgba(0,0,0,.35);
-      user-select: none;
-    }
-
-    .stick {
-      position: absolute;
-      width: 74px;
-      height: 74px;
-      border-radius: 999px;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--accent);
-      box-shadow: 0 16px 36px rgba(85,199,255,.25);
-      display: grid;
-      place-items: center;
-      color: #041220;
-      font-weight: 900;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .stat {
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 10px;
-      background: rgba(255,255,255,.04);
-      text-align: center;
-    }
-
-    .stat .label { color: var(--muted); font-size: .8rem; }
-    .stat .value { font-weight: 850; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
-
-    .log {
-      height: 230px;
-      overflow: auto;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: rgba(0,0,0,.28);
-      padding: 10px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: .82rem;
-      white-space: pre-wrap;
-      line-height: 1.45;
-    }
-
-    .split2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .split3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .split4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-
-    @media (max-width: 760px) {
-      .split2, .split3, .split4 { grid-template-columns: 1fr; }
-      button { width: 100%; }
-    }
-
-    details {
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 10px 12px;
-      background: rgba(255,255,255,.035);
-    }
-
-    summary { cursor: pointer; font-weight: 800; }
-
-    .dangerText { color: #ffb3bf; }
-    .okText { color: #b9ffd5; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>R2-D2 Sphero Full Droid Console</title>
+<style>
+  :root{
+    --bg:#07111f; --panel:#0d1b2d; --panel2:#111f33; --cyan:#39e6ff; --blue:#5aa8ff; --pink:#ff5bc8;
+    --amber:#ffd166; --red:#ff4d6d; --green:#60f29d; --muted:#6b87a4; --line:#1f6b86;
+  }
+  *{box-sizing:border-box} html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--cyan);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;user-select:none}
+  body:before{content:"";position:fixed;inset:0;background-image:linear-gradient(rgba(57,230,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(57,230,255,.055) 1px,transparent 1px),radial-gradient(circle at 50% 5%,rgba(0,140,255,.18),transparent 38%);background-size:34px 34px,34px 34px,100% 100%;pointer-events:none}
+  button,input,select{font:inherit} button{cursor:pointer} button:disabled{opacity:.45;cursor:not-allowed}
+  .app{position:relative;height:100vh;padding:7px;display:grid;grid-template-rows:48px 1fr 24px;gap:6px}
+  header{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;border:1px solid var(--line);background:rgba(7,17,31,.78);border-radius:12px;padding:6px 8px;box-shadow:0 0 22px rgba(57,230,255,.14)}
+  h1{font-size:18px;letter-spacing:.16em;margin:0;color:white;text-shadow:0 0 12px var(--cyan)}
+  .sub{font-size:9px;color:var(--muted);letter-spacing:.08em;margin-top:2px}.status{font-size:10px;color:var(--amber);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:41vw}.pill{border:1px solid var(--line);background:#081426;border-radius:999px;padding:4px 8px;font-size:10px;white-space:nowrap}.good{color:var(--green)}.bad{color:var(--red)}.warn{color:var(--amber)}
+  .btn{border:1px solid #2c9ab9;background:#0b3f58;color:#dffbff;border-radius:8px;padding:7px 9px;text-transform:uppercase;font-weight:800;font-size:10px;letter-spacing:.06em}.btn:hover{filter:brightness(1.18)}.btn.red{border-color:#aa3351;background:#491525;color:#ffe8ee}.btn.pink{border-color:#b33c93;background:#42163b;color:#ffd7f4}.btn.blue{border-color:#2b75c7;background:#12335f;color:#e1efff}.btn.green{border-color:#209958;background:#123d2b;color:#dfffea}.btn.amber{border-color:#b58b27;background:#40310f;color:#fff4d0}.btn.ghost{background:#071426;border-color:#224c66;color:#9bdff2}
+  main{min-height:0;display:grid;grid-template-columns:1.05fr .95fr 1.05fr 1fr;grid-template-rows:1.05fr .95fr .88fr;gap:6px;opacity:.52;pointer-events:none;transition:.25s}.online main{opacity:1;pointer-events:auto}
+  section{min-width:0;min-height:0;border:1px solid rgba(57,230,255,.25);background:rgba(13,27,45,.72);border-radius:12px;padding:7px;box-shadow:inset 0 0 20px rgba(57,230,255,.035)}
+  .span2{grid-column:span 2}.span3{grid-column:span 3}.row2{grid-row:span 2}.title{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:5px;color:#b7f6ff;font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:.12em}.hint{font-size:8px;color:var(--muted);font-weight:600;letter-spacing:0;text-transform:none}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:5px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.stack{display:flex;flex-direction:column;gap:5px}.row{display:flex;align-items:center;gap:5px}.grow{flex:1}.right{text-align:right}.tiny{font-size:8px;color:var(--muted)}
+  label{font-size:8px;color:#8dcbe3;text-transform:uppercase;font-weight:900;letter-spacing:.05em} select,input[type=text],input[type=number]{width:100%;background:#061323;color:#dffbff;border:1px solid #1f5770;border-radius:7px;padding:6px;font-size:10px;outline:none} select:focus,input:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(57,230,255,.25)} input[type=range]{width:100%;accent-color:var(--cyan)} input[type=color]{width:100%;height:28px;background:#061323;border:1px solid #1f5770;border-radius:7px;padding:2px}.check{display:flex;align-items:center;gap:4px;font-size:8px;color:#a6cfe1;text-transform:uppercase}.check input{accent-color:var(--cyan)}
+  .drive{display:grid;grid-template-columns:122px 1fr;gap:8px;height:calc(100% - 18px)}.pad{align-self:center;justify-self:center;width:116px;height:116px;border:3px solid #0f6b83;border-radius:999px;background:#061323;position:relative;touch-action:none;box-shadow:inset 0 0 22px rgba(57,230,255,.1)}.nub{position:absolute;left:50%;top:50%;width:25px;height:25px;margin:-12.5px 0 0 -12.5px;border-radius:999px;background:var(--cyan);box-shadow:0 0 18px var(--cyan);pointer-events:none}.arrow{position:absolute;inset:0;transform:rotate(0deg);opacity:.35;pointer-events:none}.arrow:before{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%);border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:14px solid var(--cyan)}.reverse .arrow:before{border-bottom-color:var(--red)}.keys{display:grid;grid-template-columns:30px 30px 30px;gap:4px;justify-content:center}.key{height:30px;border:1px solid #1f5770;border-radius:7px;background:#061323;display:flex;align-items:center;justify-content:center;font-weight:900}.key.active{background:#087993;color:white;border-color:var(--cyan);box-shadow:0 0 14px rgba(57,230,255,.65)}.metric{background:#061323;border:1px solid #16445a;border-radius:8px;padding:5px;text-align:center}.metric b{display:block;color:white;font-size:15px;margin-top:2px}.log{height:100%;overflow:hidden;background:#030b14;border:1px solid #17465a;border-radius:8px;padding:5px;font-size:9px;color:#9fc8d6;line-height:1.32}.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.warning{display:none;position:absolute;left:7px;right:7px;top:62px;z-index:5;border:1px solid #b03752;background:#3c1021;color:#ffe7ee;border-radius:10px;padding:8px;font-size:10px}.show{display:block}.kbd{padding:1px 4px;border:1px solid #295c72;border-radius:4px;background:#071426;color:#b7f6ff}.hidden{display:none!important}
+  @media(max-width:980px){.app{transform-origin:top left;transform:scale(.86);width:116.3vw;height:116.3vh}header{grid-template-columns:1fr auto auto}.status{max-width:34vw}.hide-sm{display:none}.grid4{grid-template-columns:repeat(2,1fr)}}
+</style>
 </head>
 <body>
+<div class="app" id="app">
   <header>
-    <div class="wrap hero">
-      <div>
-        <h1>R2-D2 Sphero Web Bluetooth Controller</h1>
-        <div class="subtitle">Single-file HTML app for direct BLE control: drive, stance, dome, animations, LEDs, sound, sensors, power, raw packets.</div>
-      </div>
-      <div class="row">
-        <span class="pill"><span id="statusDot" class="dot"></span><span id="statusText">Disconnected</span></span>
-        <input type="hidden" id="scanMode" value="all" />
-        <button id="connectBtn">Connect R2-D2</button>
-        <button id="reconnectBtn" class="secondary" hidden style="display:none">Reconnect remembered</button>
-        <button id="disconnectBtn" class="secondary" disabled>Disconnect</button>
-      </div>
+    <div><h1>ASTROMECH LINK</h1><div class="sub">FULL R2-D2 / R2-Q5 SPHERO V2 CONSOLE · single-file Web Bluetooth</div></div>
+    <div class="status" id="statusText">STATUS: standby. Use Chrome/Edge with Bluetooth.</div>
+    <div class="pill" id="batteryText">BATT: --</div>
+    <div class="row">
+      <button class="btn" id="connectBtn">Connect</button>
+      <button class="btn red hidden" id="disconnectBtn">Disconnect</button>
     </div>
   </header>
 
-  <main class="wrap">
-    <section class="grid">
-      <div class="card wide">
-        <h2>Drive <span class="pill tiny">Keyboard: <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> / <span class="kbd">Space</span></span></h2>
-        <div class="split2">
-          <div>
-            <div class="joystickBox">
-              <div id="joystick" class="joystick" aria-label="Drive joystick" role="application">
-                <div id="stick" class="stick">R2</div>
-              </div>
-            </div>
-            <div class="stats">
-              <div class="stat"><div class="label">Speed</div><div id="speedRead" class="value">0</div></div>
-              <div class="stat"><div class="label">Heading</div><div id="headingRead" class="value">0°</div></div>
-              <div class="stat"><div class="label">Flags</div><div id="flagsRead" class="value">0x00</div></div>
-            </div>
-          </div>
-          <div>
-            <div class="row">
-              <label>Speed limit <span class="readout" id="speedLimitOut">120</span>
-                <input id="speedLimit" type="range" min="0" max="255" value="120" />
-              </label>
-              <label>Send interval ms <span class="readout" id="driveIntervalOut">120</span>
-                <input id="driveInterval" type="range" min="60" max="400" value="120" />
-              </label>
-            </div>
-            <div class="row">
-              <label>Manual heading
-                <input id="manualHeading" type="number" min="0" max="359" value="0" />
-              </label>
-              <label>Manual speed
-                <input id="manualSpeed" type="number" min="0" max="255" value="80" />
-              </label>
-            </div>
-            <div class="row">
-              <button id="rollBtn">Roll</button>
-              <button id="stopBtn" class="danger">Stop</button>
-              <button id="resetYawBtn" class="secondary">Reset yaw / aim</button>
-            </div>
-            <div class="row">
-              <button data-heading="0" class="headingBtn secondary">Forward</button>
-              <button data-heading="90" class="headingBtn secondary">Right</button>
-              <button data-heading="180" class="headingBtn secondary">Back</button>
-              <button data-heading="270" class="headingBtn secondary">Left</button>
-            </div>
-            <details style="margin-top:10px">
-              <summary>Raw motors</summary>
-              <div class="row" style="margin-top:10px">
-                <label>Left mode
-                  <select id="leftMode"><option value="0">Off</option><option value="1">Forward</option><option value="2">Reverse</option></select>
-                </label>
-                <label>Left speed
-                  <input id="leftRawSpeed" type="number" min="0" max="255" value="80" />
-                </label>
-                <label>Right mode
-                  <select id="rightMode"><option value="0">Off</option><option value="1">Forward</option><option value="2">Reverse</option></select>
-                </label>
-                <label>Right speed
-                  <input id="rightRawSpeed" type="number" min="0" max="255" value="80" />
-                </label>
-              </div>
-              <div class="row"><button id="rawMotorsBtn" class="warn">Send raw motor command</button></div>
-            </details>
+  <div class="warning" id="sandboxWarning">⚠️ Web Bluetooth is blocked here. Save this as a local .html file or serve it from HTTPS/localhost, then open in Chrome/Edge.</div>
+
+  <main id="controlPanel">
+    <section class="row2">
+      <div class="title">Drive <span class="hint">WASD/Arrows + joystick</span></div>
+      <div class="drive">
+        <div id="joystickArea" class="pad">
+          <div id="headingArrow" class="arrow"></div><div id="joystickNub" class="nub"></div>
+        </div>
+        <div class="stack">
+          <div class="keys"><div></div><div id="key-w" class="key">W</div><div></div><div id="key-a" class="key">A</div><div id="key-s" class="key">S</div><div id="key-d" class="key">D</div></div>
+          <div class="grid2"><button class="btn red" id="stopBtn">STOP</button><button class="btn amber" id="resetYawBtn">Reset Yaw</button></div>
+          <label>Max speed <span id="speedLabel" class="right">80</span></label><input id="speedMax" type="range" min="10" max="255" value="80" />
+          <div class="grid2"><div class="metric">Speed<b id="spdOut">0</b></div><div class="metric">Heading<b id="hdgOut">0°</b></div></div>
+          <div class="grid2">
+            <label class="check"><input id="reverseToggle" type="checkbox"> Reverse <span class="kbd">Shift</span></label>
+            <label class="check"><input id="turboToggle" type="checkbox"> Turbo</label>
+            <label class="check"><input id="fastTurnToggle" type="checkbox"> Fast turn</label>
+            <label class="check"><input id="driftToggle" type="checkbox"> Drift</label>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="card">
-        <h2>Power & status</h2>
-        <div class="row">
-          <button id="wakeBtn" class="ok">Wake / init</button>
-          <button id="sleepBtn" class="danger">Sleep</button>
-        </div>
-        <div class="stats">
-          <div class="stat"><div class="label">Battery</div><div id="batteryPct" class="value">—</div></div>
-          <div class="stat"><div class="label">Voltage</div><div id="batteryVolt" class="value">—</div></div>
-          <div class="stat"><div class="label">State</div><div id="batteryState" class="value">—</div></div>
-        </div>
-        <div class="row" style="margin-top:12px">
-          <button id="batteryBtn" class="secondary">Read battery</button>
-          <button id="volumeReadBtn" class="secondary">Read volume</button>
-        </div>
-        <p class="tiny muted">Serve this file from <span class="kbd">https://</span> or <span class="kbd">localhost</span>. Chrome/Edge desktop or Android Chrome are the best targets for Web Bluetooth. The Connect R2-D2 button uses the broad Bluetooth chooser flow that worked with your uploaded implementation.</p>
+    <section>
+      <div class="title">Animatronic Body <span class="hint">legs/head</span></div>
+      <div class="grid4">
+        <button class="btn ghost" onclick="setLegAction(0)">Leg Stop</button><button class="btn" onclick="setLegAction(1)">3-Leg</button><button class="btn" onclick="setLegAction(2)">2-Leg</button><button class="btn blue" onclick="setLegAction(3)">Waddle</button>
       </div>
+      <div class="grid2" style="margin-top:6px">
+        <div><label>Head angle <span id="headVal">0°</span></label><input id="headSlider" type="range" min="-180" max="180" value="0" /></div>
+        <div><label>Leg position <span id="legPosVal">0.00</span></label><input id="legPosSlider" type="range" min="0" max="1" step="0.01" value="0" /></div>
+      </div>
+      <div class="grid4" style="margin-top:6px">
+        <button class="btn ghost" id="headCenterBtn">Head 0</button><button class="btn ghost" id="getHeadBtn">Get Head</button><button class="btn ghost" id="getLegPosBtn">Get Leg</button><button class="btn ghost" id="legNotifyBtn">Leg Notify</button>
+      </div>
+    </section>
 
-      <div class="card half">
-        <h2>Dome, stance & animatronics</h2>
-        <div class="row">
-          <label>Dome angle <span id="domeOut" class="readout">0°</span>
-            <input id="domeAngle" type="range" min="-180" max="180" value="0" />
-          </label>
-        </div>
-        <div class="row">
-          <button id="domeBtn">Set dome</button>
-          <button id="domeCenterBtn" class="secondary">Center</button>
-          <button id="domeSweepBtn" class="secondary">Sweep</button>
-        </div>
-        <div class="row">
-          <button data-leg="1" class="legBtn ok">Tripod / 3 legs</button>
-          <button data-leg="2" class="legBtn warn">Bipod / 2 legs</button>
-          <button data-leg="3" class="legBtn secondary">Start waddle</button>
-          <button data-leg="0" class="legBtn danger">Stop leg action</button>
-        </div>
-        <div class="row">
-          <button id="idleOnBtn" class="secondary">Idle animations on</button>
-          <button id="idleOffBtn" class="secondary">Idle animations off</button>
-          <button id="trophyOnBtn" class="secondary">Trophy mode on</button>
-          <button id="trophyOffBtn" class="secondary">Trophy mode off</button>
-        </div>
+    <section>
+      <div class="title">Optics <span class="hint">all R2 LEDs</span></div>
+      <div class="grid2">
+        <div><label>Front logic RGB</label><input type="color" id="ledFront" value="#00aaff"></div>
+        <div><label>Rear logic RGB</label><input type="color" id="ledRear" value="#ff0000"></div>
+        <div><label>Logic brightness <span id="logicVal">255</span></label><input type="range" id="logicInt" min="0" max="255" value="255"></div>
+        <div><label>Holo projector <span id="holoVal">0</span></label><input type="range" id="holoInt" min="0" max="255" value="0"></div>
       </div>
+      <div class="grid3" style="margin-top:6px"><button class="btn ghost" id="ledApplyBtn">Apply</button><button class="btn ghost" id="idleLedBtn">Idle LEDs</button><button class="btn red" id="ledOffBtn">Lights Off</button></div>
+    </section>
 
-      <div class="card half">
-        <h2>Built-in animations</h2>
-        <div class="row">
-          <label>Animation
-            <select id="animationSelect"></select>
-          </label>
-          <label>Custom ID
-            <input id="animationCustom" type="number" min="0" max="65535" value="13" />
-          </label>
-        </div>
-        <div class="row">
-          <button id="playAnimBtn">Play selected</button>
-          <button id="playCustomAnimBtn" class="secondary">Play custom ID</button>
-          <button id="stopAnimBtn" class="danger">Stop animation</button>
-          <button id="randomAnimBtn" class="warn">Random</button>
-        </div>
-        <p class="tiny muted">Animation IDs 0–55 are named from public community mappings; the custom box lets you try additional firmware IDs.</p>
-      </div>
+    <section>
+      <div class="title">Audio Library <span class="hint" id="soundCount">0 sounds</span></div>
+      <div class="grid3"><select id="soundDroid"><option value="">All droids</option><option>R2</option><option>R2Q5</option><option>BB8</option><option>BB9E</option><option>TEST</option></select><select id="soundMood"><option value="">All groups</option></select><input type="text" id="soundFilter" placeholder="filter sounds..." /></div>
+      <div class="row" style="margin-top:5px"><select id="soundSelect" class="grow"></select><button class="btn pink" id="playSoundBtn">Play</button><button class="btn red" id="stopAudioBtn">Stop</button></div>
+      <div class="grid2" style="margin-top:5px"><div><label>Volume <span id="volLabel">50%</span></label><input id="masterVolume" type="range" min="0" max="255" value="128"></div><div><label>Playback</label><select id="playbackMode"><option value="0">Immediate</option><option value="1">Only if idle</option><option value="2">Queue after current</option></select></div></div>
+    </section>
 
-      <div class="card half">
-        <h2>LEDs</h2>
-        <div class="split3">
-          <label>Front RGB
-            <input id="frontColor" type="color" value="#00aaff" />
-          </label>
-          <label>Back RGB
-            <input id="backColor" type="color" value="#ff2a55" />
-          </label>
-          <label>All RGB
-            <input id="allColor" type="color" value="#ffffff" />
-          </label>
-        </div>
-        <div class="row">
-          <button id="frontLedBtn">Set front</button>
-          <button id="backLedBtn">Set back</button>
-          <button id="allLedBtn">Set front+back</button>
-          <button id="ledsOffBtn" class="danger">LEDs off</button>
-        </div>
-        <div class="row">
-          <label>Logic displays <span id="logicOut" class="readout">255</span>
-            <input id="logicIntensity" type="range" min="0" max="255" value="255" />
-          </label>
-          <label>Holo projector <span id="holoOut" class="readout">255</span>
-            <input id="holoIntensity" type="range" min="0" max="255" value="255" />
-          </label>
-        </div>
-        <div class="row">
-          <button id="logicBtn" class="secondary">Set logic</button>
-          <button id="holoBtn" class="secondary">Set holo</button>
-          <button id="releaseLedBtn" class="secondary">Release LED requests</button>
-        </div>
-      </div>
+    <section>
+      <div class="title">Routines <span class="hint">animations</span></div>
+      <div class="row"><select id="animSelect" class="grow"></select><button class="btn blue" id="playAnimBtn">Play</button><button class="btn red" id="stopAnimBtn">Stop</button></div>
+      <div class="grid3" style="margin-top:6px"><button class="btn ghost" id="idleOnBtn">Idle On</button><button class="btn ghost" id="idleOffBtn">Idle Off</button><button class="btn ghost" id="trophyBtn">Trophy</button></div>
+    </section>
 
-      <div class="card half">
-        <h2>Sounds</h2>
-        <div class="row">
-          <label>Sound preset
-            <select id="soundSelect"></select>
-          </label>
-          <label>Custom sound ID
-            <input id="soundCustom" type="number" min="0" max="65535" value="1910" />
-          </label>
-        </div>
-        <div class="row">
-          <label>Volume <span id="volumeOut" class="readout">180</span>
-            <input id="volume" type="range" min="0" max="255" value="180" />
-          </label>
-          <label>Playback mode
-            <select id="playbackMode">
-              <option value="0">Immediately</option>
-              <option value="1">Only if not playing</option>
-              <option value="2">After current sound</option>
-            </select>
-          </label>
-        </div>
-        <div class="row">
-          <button id="setVolumeBtn" class="secondary">Set volume</button>
-          <button id="playSoundBtn">Play selected</button>
-          <button id="playCustomSoundBtn" class="secondary">Play custom</button>
-          <button id="stopSoundBtn" class="danger">Stop audio</button>
-        </div>
-        <p class="tiny muted">Includes reverse-engineered sound IDs for BB-8, BB-9E, R2-D2, and R2-Q5. On BB-8 and BB-9E, the original apps often played audio from the phone; R2-D2/R2-Q5 firmware compatibility can vary.</p>
-      </div>
+    <section>
+      <div class="title">Telemetry <span class="hint">IMU/battery/events</span></div>
+      <div class="grid4"><button class="btn ghost" id="imuBtn">IMU</button><button class="btn ghost" id="collisionBtn">Collision</button><button class="btn ghost" id="batteryBtn">Battery</button><button class="btn ghost" id="voltageBtn">Voltage</button></div>
+      <div class="grid4" style="margin-top:6px"><div class="metric">Pitch<b id="imuPitch">0°</b></div><div class="metric">Roll<b id="imuRoll">0°</b></div><div class="metric">Yaw<b id="imuYaw">0°</b></div><div class="metric">Head<b id="headOut">--</b></div></div>
+    </section>
 
-      <div class="card half">
-        <h2>Sensors & notifications</h2>
-        <div class="row">
-          <button id="sensorBtn">Start accelerometer stream</button>
-          <button id="sensorStopNoteBtn" class="secondary">Note: reconnect to stop stream</button>
-        </div>
-        <div class="stats">
-          <div class="stat"><div class="label">X</div><div id="accX" class="value">—</div></div>
-          <div class="stat"><div class="label">Y</div><div id="accY" class="value">—</div></div>
-          <div class="stat"><div class="label">Z</div><div id="accZ" class="value">—</div></div>
-        </div>
-        <div class="row" style="margin-top:12px">
-          <button id="motorStallNotifyBtn" class="secondary">Toggle motor-stall notify</button>
-          <button id="batteryNotifyBtn" class="secondary">Toggle battery notify</button>
-          <button id="legNotifyBtn" class="secondary">Toggle leg notify</button>
-        </div>
-        <p class="tiny muted">Sensor formats vary by firmware. Raw incoming frames are always shown in the log.</p>
-      </div>
+    <section>
+      <div class="title">Expert Drive <span class="hint">raw/stabilization</span></div>
+      <div class="grid2"><div><label>Stabilization</label><select id="stabSelect"><option value="1">Full control</option><option value="0">No control</option><option value="2">Pitch</option><option value="3">Roll</option><option value="4">Yaw</option><option value="5">Speed + Yaw</option></select></div><div><label>Raw motor</label><select id="rawIndex"><option value="0">Left drive</option><option value="1">Right drive</option><option value="2">Head</option><option value="3">Leg</option></select></div></div>
+      <div class="grid3" style="margin-top:5px"><select id="rawMode"><option value="0">Off</option><option value="1">Forward</option><option value="2">Reverse</option></select><input type="range" id="rawSpeed" min="0" max="255" value="80"><button class="btn amber" id="rawSendBtn">Send</button></div>
+      <div class="grid3" style="margin-top:5px"><button class="btn ghost" id="stabBtn">Set Stab</button><button class="btn red" id="rawAllOffBtn">Raw Off</button><button class="btn red" id="sleepBtn">Sleep</button></div>
+    </section>
 
-      <div class="card half">
-        <h2>Advanced raw packet sender</h2>
-        <div class="split3">
-          <label>DID hex
-            <input id="rawDid" type="text" value="17" />
-          </label>
-          <label>CID hex
-            <input id="rawCid" type="text" value="05" />
-          </label>
-          <label>Wait for response
-            <select id="rawWait"><option value="1">Yes</option><option value="0">No</option></select>
-          </label>
-        </div>
-        <label style="margin-top:10px">Payload hex bytes
-          <textarea id="rawPayload">00 0D</textarea>
-        </label>
-        <div class="row">
-          <button id="sendRawBtn" class="warn">Send raw command</button>
-          <button id="copyStateBtn" class="secondary">Copy connection state</button>
-        </div>
-        <p class="tiny muted">Uses flags <span class="kbd">0x0A</span> and Sphero V2 framing automatically. Example above plays animation 13.</p>
-      </div>
-
-      <div class="card full">
-        <h2>Log <button id="clearLogBtn" class="secondary">Clear</button></h2>
-        <div id="log" class="log"></div>
-        <details style="margin-top:12px">
-          <summary>Safety, compatibility and notes</summary>
-          <p class="tiny muted">
-            Web Bluetooth requires a user gesture to connect and a secure origin. Only one app can usually hold the BLE connection. Disconnect the official Sphero app first.
-            Test with R2-D2 lifted off the floor or with plenty of space before enabling drive/raw motor commands. Do not drive while the charging cable is attached.
-          </p>
-          <p class="tiny muted">
-            This page implements public reverse-engineered R2-D2/Sphero V2 commands. Some firmware revisions may reject, ignore, or time out on undocumented commands. The raw sender is included so you can extend or test additional command IDs without editing the app.
-          </p>
-        </details>
-      </div>
+    <section class="span2">
+      <div class="title">Raw Command + Event Log <span class="hint">DID CID HEXDATA</span></div>
+      <div class="row"><input id="rawCmd" class="grow" type="text" placeholder="ex: 1A 07 06 49 00" /><button class="btn amber" id="rawCmdBtn">Send Raw</button><button class="btn ghost" id="clearLogBtn">Clear</button></div>
+      <div id="eventLog" class="log" style="margin-top:5px"></div>
     </section>
   </main>
 
-  <script>
-    "use strict";
+  <footer class="tiny">Tip: hold <span class="kbd">Shift</span> for reverse. Use STOP before picking up the droid. This page sends Sphero API v2 BLE commands directly.</footer>
+</div>
 
-    /**********************************************************************
-     * Sphero R2-D2 Web Bluetooth controller
-     * Save as r2d2.html, then serve from https:// or http://localhost.
-     * Tested design target: Chrome/Edge Web Bluetooth API.
-     **********************************************************************/
+<script>
+'use strict';
 
-    const UUIDS = {
-      connectService: "00020001-574f-4f20-5370-6865726f2121",
-      connectChar: "00020005-574f-4f20-5370-6865726f2121",
-      handleChar: "00020002-574f-4f20-5370-6865726f2121",
-      mainService: "00010001-574f-4f20-5370-6865726f2121",
-      mainChar: "00010002-574f-4f20-5370-6865726f2121"
-    };
+const SPHERO_UUID_BASE = "-574f-4f20-5370-6865726f2121";
+const API_V2_SERVICE = "00010001" + SPHERO_UUID_BASE;
+const API_V2_CHARACTERISTIC = "00010002" + SPHERO_UUID_BASE;
+const API_V2_NOTIFY_CHARACTERISTIC = "00010003" + SPHERO_UUID_BASE;
+const ANTI_DOS_SERVICE = "00020001" + SPHERO_UUID_BASE;
+const ANTI_DOS_CHARACTERISTIC = "00020005" + SPHERO_UUID_BASE;
 
-    const FORCE_BAND = bytesFromAscii("usetheforce...band");
+let bluetoothDevice = null, controlChar = null, notifyChar = null, isConnected = false;
+let seqNum = 0, packetQueue = [], isWriting = false, pendingRequests = new Map();
+let currentSpeed = 0, currentHeading = 0, lastSpeed = -1, lastHeading = -1, isJoystickActive = false;
+let keys = {up:false, down:false, left:false, right:false};
+let imuEnabled = false, collisionEnabled = false, legNotifyEnabled = false, trophyEnabled = false;
 
-    const SOP = 0x8D;
-    const EOP = 0xD8;
-    const ESC = 0xAB;
-    const ESC_ESC = 0x23;
-    const ESC_SOP = 0x05;
-    const ESC_EOP = 0x50;
+const $ = id => document.getElementById(id);
+const clamp = (v,min,max) => Math.max(min, Math.min(max, v));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const logEl = $('eventLog');
+function log(msg, cls='') { const d=document.createElement('div'); d.className=cls; d.textContent=`${new Date().toLocaleTimeString()} · ${msg}`; logEl.prepend(d); while(logEl.children.length>80) logEl.lastChild.remove(); }
+function status(msg, cls='warn') { $('statusText').textContent = 'STATUS: ' + msg; $('statusText').className = 'status ' + cls; }
+function setOnline(on) { document.body.classList.toggle('online', on); $('connectBtn').classList.toggle('hidden', on); $('disconnectBtn').classList.toggle('hidden', !on); }
+function bytesToHex(a){return Array.from(a).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ')}
+function toBytesU16(v){return [(v>>8)&255, v&255]}
+function float32Bytes(v){const b=new ArrayBuffer(4); new DataView(b).setFloat32(0, parseFloat(v), false); return [...new Uint8Array(b)]}
+function parseHex(s){return s.trim().split(/[\s,]+/).filter(Boolean).map(x=>parseInt(x,16)).filter(n=>Number.isFinite(n) && n>=0 && n<=255)}
+function colorBytes(hex){return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]}
 
-    const DID = {
-      POWER: 0x13,
-      DRIVE: 0x16,
-      ANIMATRONIC: 0x17,
-      SENSOR: 0x18,
-      IO: 0x1A
-    };
+function escapeBytes(payload) {
+  const out=[];
+  for (const b of payload) {
+    if (b === 0x8D) out.push(0xAB, 0x05);
+    else if (b === 0xD8) out.push(0xAB, 0x50);
+    else if (b === 0xAB) out.push(0xAB, 0x23);
+    else out.push(b);
+  }
+  return out;
+}
+function unescapeBytes(frame) {
+  const out=[];
+  for (let i=1;i<frame.length-1;i++) {
+    if (frame[i] === 0xAB) { i++; if (frame[i]===0x23) out.push(0xAB); else if (frame[i]===0x05) out.push(0x8D); else if (frame[i]===0x50) out.push(0xD8); }
+    else out.push(frame[i]);
+  }
+  return out;
+}
+async function processQueue() {
+  if (isWriting || !isConnected || !controlChar || packetQueue.length === 0) return;
+  isWriting = true;
+  const packet = packetQueue.shift();
+  try { await controlChar.writeValueWithoutResponse(packet); }
+  catch (e) { log('BLE write failed: ' + e.message, 'bad'); }
+  isWriting = false;
+  if (packetQueue.length) setTimeout(processQueue, 18);
+}
+function sendCmd(did, cid, data = [], label = '') {
+  if (!isConnected || !controlChar) return null;
+  const flags = 0x0A, seq = seqNum & 255; seqNum = (seqNum + 1) & 255;
+  pendingRequests.set(seq, { did, cid, label, t: Date.now() });
+  let sum = flags + did + cid + seq; data.forEach(b => sum += b);
+  const payload = [flags, did, cid, seq, ...data, (~sum) & 255];
+  const frame = new Uint8Array([0x8D, ...escapeBytes(payload), 0xD8]);
+  packetQueue.push(frame); processQueue();
+  return seq;
+}
+function sendRaw(did, cid, data=[]){ return sendCmd(did, cid, data, 'raw'); }
 
-    const CID = {
-      POWER_SLEEP: 0x01,
-      POWER_BATTERY_VOLTAGE: 0x03,
-      POWER_BATTERY_STATE: 0x04,
-      POWER_ENABLE_BATTERY_STATE_NOTIFY: 0x05,
-      POWER_WAKE: 0x0D,
-      POWER_BATTERY_PERCENT: 0x10,
-      POWER_ENABLE_BATTERY_VOLTAGE_NOTIFY: 0x1B,
+$('connectBtn').addEventListener('click', async () => {
+  try {
+    $('sandboxWarning').classList.remove('show');
+    if (!navigator.bluetooth) throw new Error('Web Bluetooth is unavailable in this browser/context.');
+    status('scanning...', 'warn');
+    bluetoothDevice = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [API_V2_SERVICE, ANTI_DOS_SERVICE, 'battery_service']
+    });
+    bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+    const server = await bluetoothDevice.gatt.connect();
+    status('anti-DOS handshake...', 'warn');
+    const anti = await server.getPrimaryService(ANTI_DOS_SERVICE);
+    const antiChar = await anti.getCharacteristic(ANTI_DOS_CHARACTERISTIC);
+    await antiChar.writeValueWithResponse(new TextEncoder().encode('usetheforce...band'));
+    const api = await server.getPrimaryService(API_V2_SERVICE);
+    controlChar = await api.getCharacteristic(API_V2_CHARACTERISTIC);
+    try {
+      notifyChar = await api.getCharacteristic(API_V2_NOTIFY_CHARACTERISTIC);
+      await notifyChar.startNotifications();
+      notifyChar.addEventListener('characteristicvaluechanged', handleResponse);
+      log('API notifications enabled.');
+    } catch(e) { log('API notify characteristic unavailable: ' + e.message, 'warn'); }
+    try {
+      const bs = await server.getPrimaryService('battery_service');
+      const bc = await bs.getCharacteristic('battery_level');
+      const v = await bc.readValue(); updateBattery(v.getUint8(0) + '%');
+      await bc.startNotifications(); bc.addEventListener('characteristicvaluechanged', e => updateBattery(e.target.value.getUint8(0) + '%'));
+    } catch(e) { log('Standard battery service not found; using Sphero power commands.'); }
+    isConnected = true; setOnline(true); status('LINK ONLINE', 'good'); log('Connected to ' + (bluetoothDevice.name || 'Sphero droid'));
+    sendCmd(0x13, 0x0D, [], 'wake');
+    await sleep(280);
+    applyAllLights(); updateVolume($('masterVolume').value); requestBattery();
+  } catch (e) {
+    if (e.name === 'SecurityError' || /context|permission|bluetooth/i.test(e.message)) $('sandboxWarning').classList.add('show');
+    status('error: ' + e.message, 'bad'); log('Connect error: ' + e.message, 'bad');
+  }
+});
+$('disconnectBtn').addEventListener('click', async () => {
+  try { if (isConnected) { emergencyStop(); lightsOff(); stopAudio(); stopAnimation(); await sleep(200); sendCmd(0x13, 0x01, [], 'sleep'); await sleep(350); } if (bluetoothDevice?.gatt?.connected) await bluetoothDevice.gatt.disconnect(); }
+  catch(e){ log('Disconnect error: ' + e.message, 'bad'); }
+  finally { onDisconnected(); }
+});
+function onDisconnected(){ isConnected=false; controlChar=null; notifyChar=null; packetQueue=[]; pendingRequests.clear(); setOnline(false); status('OFFLINE', 'bad'); updateBattery('--'); imuEnabled=false; collisionEnabled=false; log('Disconnected.'); }
 
-      DRIVE_RAW_MOTORS: 0x01,
-      DRIVE_RESET_YAW: 0x06,
-      DRIVE_WITH_HEADING: 0x07,
-      DRIVE_SET_STABILIZATION: 0x0C,
-      DRIVE_ENABLE_MOTOR_STALL_NOTIFY: 0x25,
-
-      ANIM_PLAY: 0x05,
-      ANIM_LEG_ACTION: 0x0D,
-      ANIM_HEAD_POSITION: 0x0F,
-      ANIM_GET_HEAD_POSITION: 0x14,
-      ANIM_SET_LEG_POSITION: 0x15,
-      ANIM_GET_LEG_ACTION: 0x25,
-      ANIM_ENABLE_LEG_ACTION_NOTIFY: 0x2A,
-      ANIM_STOP: 0x2B,
-      ANIM_IDLE: 0x2C,
-      ANIM_TROPHY: 0x2D,
-      ANIM_GET_TROPHY: 0x2E,
-
-      SENSOR_STREAMING: 0x00,
-
-      IO_SET_LED_16: 0x0E,
-      IO_PLAY_AUDIO: 0x07,
-      IO_SET_VOLUME: 0x08,
-      IO_GET_VOLUME: 0x09,
-      IO_STOP_AUDIO: 0x0A,
-      IO_RELEASE_LED: 0x4E
-    };
-
-    const LED_MASK = {
-      FRONT: 0x0007,   // front red, green, blue
-      LOGIC: 0x0008,   // logic displays brightness
-      BACK: 0x0070,    // back red, green, blue
-      HOLO: 0x0080,    // holo projector brightness
-      FRONT_BACK: 0x0077,
-      ALL_R2: 0x00FF
-    };
-
-    const BATTERY_STATES = {
-      0: "charged",
-      1: "charging",
-      2: "not charging",
-      3: "ok",
-      4: "low",
-      5: "critical",
-      255: "unknown"
-    };
-
-    const ANIMATIONS = [
-      [0,"CHARGER_1"],[1,"CHARGER_2"],[2,"CHARGER_3"],[3,"CHARGER_4"],[4,"CHARGER_5"],[5,"CHARGER_6"],[6,"CHARGER_7"],
-      [7,"EMOTE_ALARM"],[8,"EMOTE_ANGRY"],[9,"EMOTE_ANNOYED"],[10,"EMOTE_CHATTY"],[11,"EMOTE_DRIVE"],[12,"EMOTE_EXCITED"],
-      [13,"EMOTE_HAPPY"],[14,"EMOTE_ION_BLAST"],[15,"EMOTE_LAUGH"],[16,"EMOTE_NO"],[17,"EMOTE_SAD"],[18,"EMOTE_SASSY"],
-      [19,"EMOTE_SCARED"],[20,"EMOTE_SPIN"],[21,"EMOTE_YES"],[22,"EMOTE_SCAN"],[23,"EMOTE_SLEEP"],[24,"EMOTE_SURPRISED"],
-      [25,"IDLE_1"],[26,"IDLE_2"],[27,"IDLE_3"],[28,"PATROL_ALARM"],[29,"PATROL_HIT"],[30,"PATROL_PATROLLING"],
-      [31,"WWM_ANGRY"],[32,"WWM_ANXIOUS"],[33,"WWM_BOW"],[34,"WWM_CONCERN"],[35,"WWM_CURIOUS"],[36,"WWM_DOUBLE_TAKE"],
-      [37,"WWM_EXCITED"],[38,"WWM_FIERY"],[39,"WWM_FRUSTRATED"],[40,"WWM_HAPPY"],[41,"WWM_JITTERY"],[42,"WWM_LAUGH"],
-      [43,"WWM_LONG_SHAKE"],[44,"WWM_NO"],[45,"WWM_OMINOUS"],[46,"WWM_RELIEVED"],[47,"WWM_SAD"],[48,"WWM_SCARED"],
-      [49,"WWM_SHAKE"],[50,"WWM_SURPRISED"],[51,"WWM_TAUNTING"],[52,"WWM_WHISPER"],[53,"WWM_YELLING"],[54,"WWM_YOOHOO"],[55,"MOTOR"],
-      [56,"UNKNOWN_56 / firmware-dependent"]
-    ];
-
-    const SOUND_GROUPS = {
-      "Test tones": [
-        [1, "TEST_1497HZ"], [32, "TEST_200HZ"], [63, "TEST_2517HZ"], [94, "TEST_3581HZ"],
-        [125, "TEST_431HZ"], [156, "TEST_6011HZ"], [187, "TEST_853HZ"]
-      ],
-      "BB-8": [
-        [218,"BB8_ALARM_1"],[235,"BB8_ALARM_10"],[254,"BB8_ALARM_11"],[258,"BB8_ALARM_12"],[264,"BB8_ALARM_2"],
-        [268,"BB8_ALARM_3"],[272,"BB8_ALARM_4"],[279,"BB8_ALARM_6"],[288,"BB8_ALARM_7"],[296,"BB8_ALARM_8"],
-        [301,"BB8_ALARM_9"],[309,"BB8_BOOT_UP"],[330,"BB8_BOOT_UP_2"],[352,"BB8_CHATTY_1"],[356,"BB8_CHATTY_10"],
-        [360,"BB8_CHATTY_11"],[368,"BB8_CHATTY_12"],[375,"BB8_CHATTY_13"],[381,"BB8_CHATTY_14"],[390,"BB8_CHATTY_15"],
-        [397,"BB8_CHATTY_16"],[404,"BB8_CHATTY_17"],[410,"BB8_CHATTY_18"],[417,"BB8_CHATTY_19"],[430,"BB8_CHATTY_2"],
-        [464,"BB8_CHATTY_20"],[471,"BB8_CHATTY_22"],[479,"BB8_CHATTY_23"],[492,"BB8_CHATTY_24"],[518,"BB8_CHATTY_25"],
-        [525,"BB8_CHATTY_26"],[537,"BB8_CHATTY_27"],[544,"BB8_CHATTY_3"],[557,"BB8_CHATTY_4"],[570,"BB8_CHATTY_5"],
-        [577,"BB8_CHATTY_6"],[581,"BB8_CHATTY_7"],[587,"BB8_CHATTY_8"],[599,"BB8_CHATTY_9"],[606,"BB8_DONT_KNOW"],
-        [612,"BB8_EXCITED_1"],[622,"BB8_EXCITED_2"],[630,"BB8_EXCITED_3"],[644,"BB8_EXCITED_4"],[671,"BB8_HEY_1"],
-        [682,"BB8_HEY_10"],[686,"BB8_HEY_11"],[690,"BB8_HEY_12"],[700,"BB8_HEY_13"],[724,"BB8_HEY_2"],
-        [732,"BB8_HEY_3"],[734,"BB8_HEY_4"],[739,"BB8_HEY_5"],[743,"BB8_HEY_6"],[747,"BB8_HEY_7"],
-        [753,"BB8_HEY_8"],[757,"BB8_HEY_9"],[761,"BB8_LAUGH_1"],[764,"BB8_LAUGH_2"],[787,"BB8_NEGATIVE_1"],
-        [792,"BB8_NEGATIVE_10"],[802,"BB8_NEGATIVE_11"],[813,"BB8_NEGATIVE_12"],[825,"BB8_NEGATIVE_13"],[831,"BB8_NEGATIVE_14"],
-        [836,"BB8_NEGATIVE_15"],[859,"BB8_NEGATIVE_16"],[867,"BB8_NEGATIVE_17"],[874,"BB8_NEGATIVE_18"],[888,"BB8_NEGATIVE_19"],
-        [896,"BB8_NEGATIVE_2"],[902,"BB8_NEGATIVE_20"],[916,"BB8_NEGATIVE_21"],[927,"BB8_NEGATIVE_22"],[935,"BB8_NEGATIVE_23"],
-        [946,"BB8_NEGATIVE_24"],[953,"BB8_NEGATIVE_25"],[963,"BB8_NEGATIVE_26"],[969,"BB8_NEGATIVE_27"],[983,"BB8_NEGATIVE_28"],
-        [988,"BB8_NEGATIVE_29"],[998,"BB8_NEGATIVE_3"],[1003,"BB8_NEGATIVE_30"],[1010,"BB8_NEGATIVE_4"],[1020,"BB8_NEGATIVE_5"],
-        [1032,"BB8_NEGATIVE_6"],[1040,"BB8_NEGATIVE_7"],[1052,"BB8_NEGATIVE_8"],[1064,"BB8_NEGATIVE_9"],[1077,"BB8_POSITIVE_1"],
-        [1082,"BB8_POSITIVE_10"],[1087,"BB8_POSITIVE_11"],[1092,"BB8_POSITIVE_12"],[1096,"BB8_POSITIVE_13"],[1102,"BB8_POSITIVE_14"],
-        [1109,"BB8_POSITIVE_15"],[1113,"BB8_POSITIVE_16"],[1118,"BB8_POSITIVE_2"],[1123,"BB8_POSITIVE_3"],[1130,"BB8_POSITIVE_4"],
-        [1135,"BB8_POSITIVE_5"],[1138,"BB8_POSITIVE_6"],[1147,"BB8_POSITIVE_7"],[1150,"BB8_POSITIVE_8"],[1157,"BB8_POSITIVE_9"],
-        [1163,"BB8_SAD_1"],[1170,"BB8_SAD_10"],[1178,"BB8_SAD_11"],[1186,"BB8_SAD_12"],[1192,"BB8_SAD_13"],
-        [1199,"BB8_SAD_14"],[1205,"BB8_SAD_15"],[1213,"BB8_SAD_16"],[1220,"BB8_SAD_17"],[1230,"BB8_SAD_18"],
-        [1236,"BB8_SAD_2"],[1240,"BB8_SAD_3"],[1250,"BB8_SAD_4"],[1268,"BB8_SAD_5"],[1275,"BB8_SAD_6"],
-        [1281,"BB8_SAD_7"],[1295,"BB8_SAD_8"],[1303,"BB8_SAD_9"],[1308,"BB8_SHORTCUT"],[1324,"BB8_WOW_1"]
-      ],
-      "BB-9E": [
-        [1329,"BB9E_ALARM_1"],[1347,"BB9E_ALARM_2"],[1363,"BB9E_ALARM_3"],[1375,"BB9E_ALARM_4"],[1384,"BB9E_ALARM_5"],
-        [1394,"BB9E_CHATTY_1"],[1408,"BB9E_CHATTY_2"],[1432,"BB9E_EXCITED_1"],[1442,"BB9E_EXCITED_2"],[1463,"BB9E_EXCITED_3"],
-        [1476,"BB9E_HEY_1"],[1486,"BB9E_HEY_2"],[1494,"BB9E_NEGATIVE_1"],[1505,"BB9E_NEGATIVE_2"],[1516,"BB9E_NEGATIVE_3"],
-        [1523,"BB9E_NEGATIVE_4"],[1531,"BB9E_POSITIVE_1"],[1549,"BB9E_POSITIVE_2"],[1558,"BB9E_POSITIVE_3"],[1571,"BB9E_POSITIVE_4"],
-        [1583,"BB9E_POSITIVE_5"],[1592,"BB9E_SAD_1"],[1600,"BB9E_SAD_2"]
-      ],
-      "R2-D2": [
-        [1609,"R2_FALL"],[1623,"R2_HIT_1"],[1628,"R2_HIT_10"],[1635,"R2_HIT_11"],[1642,"R2_HIT_2"],
-        [1647,"R2_HIT_3"],[1653,"R2_HIT_4"],[1659,"R2_HIT_5"],[1664,"R2_HIT_6"],[1669,"R2_HIT_7"],
-        [1676,"R2_HIT_8"],[1684,"R2_HIT_9"],[1690,"R2_STEP_1"],[1693,"R2_STEP_2"],[1696,"R2_STEP_3"],
-        [1698,"R2_STEP_4"],[1700,"R2_STEP_5"],[1702,"R2_STEP_6"],[1704,"R2_ACCESS_PANELS"],[1737,"R2_ALARM_1"],
-        [1747,"R2_ALARM_10"],[1756,"R2_ALARM_12"],[1763,"R2_ALARM_13"],[1771,"R2_ALARM_14"],[1784,"R2_ALARM_15"],
-        [1791,"R2_ALARM_16"],[1809,"R2_ALARM_2"],[1821,"R2_ALARM_3"],[1831,"R2_ALARM_4"],[1835,"R2_ALARM_5"],
-        [1843,"R2_ALARM_6"],[1858,"R2_ALARM_7"],[1867,"R2_ALARM_8"],[1893,"R2_ALARM_9"],[1910,"R2_ANNOYED"],
-        [1915,"R2_BURNOUT"],[1950,"R2_CHATTY_1"],[1959,"R2_CHATTY_10"],[1966,"R2_CHATTY_11"],[1977,"R2_CHATTY_12"],
-        [1987,"R2_CHATTY_13"],[2002,"R2_CHATTY_14"],[2007,"R2_CHATTY_15"],[2010,"R2_CHATTY_16"],[2019,"R2_CHATTY_17"],
-        [2028,"R2_CHATTY_18"],[2039,"R2_CHATTY_19"],[2061,"R2_CHATTY_2"],[2072,"R2_CHATTY_20"],[2080,"R2_CHATTY_21"],
-        [2085,"R2_CHATTY_22"],[2095,"R2_CHATTY_23"],[2105,"R2_CHATTY_24"],[2121,"R2_CHATTY_25"],[2132,"R2_CHATTY_26"],
-        [2143,"R2_CHATTY_27"],[2157,"R2_CHATTY_28"],[2170,"R2_CHATTY_29"],[2174,"R2_CHATTY_3"],[2184,"R2_CHATTY_30"],
-        [2188,"R2_CHATTY_31"],[2198,"R2_CHATTY_32"],[2202,"R2_CHATTY_33"],[2211,"R2_CHATTY_34"],[2221,"R2_CHATTY_35"],
-        [2232,"R2_CHATTY_36"],[2241,"R2_CHATTY_37"],[2253,"R2_CHATTY_38"],[2264,"R2_CHATTY_39"],[2276,"R2_CHATTY_4"],
-        [2285,"R2_CHATTY_40"],[2292,"R2_CHATTY_41"],[2307,"R2_CHATTY_42"],[2322,"R2_CHATTY_43"],[2332,"R2_CHATTY_44"],
-        [2344,"R2_CHATTY_45"],[2357,"R2_CHATTY_46"],[2368,"R2_CHATTY_47"],[2377,"R2_CHATTY_48"],[2387,"R2_CHATTY_49"],
-        [2399,"R2_CHATTY_5"],[2413,"R2_CHATTY_50"],[2424,"R2_CHATTY_51"],[2439,"R2_CHATTY_52"],[2452,"R2_CHATTY_53"],
-        [2457,"R2_CHATTY_54"],[2463,"R2_CHATTY_55"],[2474,"R2_CHATTY_56"],[2492,"R2_CHATTY_57"],[2509,"R2_CHATTY_58"],
-        [2519,"R2_CHATTY_59"],[2524,"R2_CHATTY_6"],[2535,"R2_CHATTY_60"],[2543,"R2_CHATTY_61"],[2554,"R2_CHATTY_62"],
-        [2562,"R2_CHATTY_7"],[2572,"R2_CHATTY_8"],[2579,"R2_CHATTY_9"],[2586,"R2_ENGAGE_HYPER_DRIVE"],[2600,"R2_EXCITED_1"],
-        [2615,"R2_EXCITED_10"],[2633,"R2_EXCITED_11"],[2644,"R2_EXCITED_12"],[2654,"R2_EXCITED_13"],[2662,"R2_EXCITED_14"],
-        [2680,"R2_EXCITED_15"],[2691,"R2_EXCITED_16"],[2708,"R2_EXCITED_2"],[2726,"R2_EXCITED_3"],[2730,"R2_EXCITED_4"],
-        [2736,"R2_EXCITED_5"],[2753,"R2_EXCITED_6"],[2767,"R2_EXCITED_7"],[2777,"R2_EXCITED_8"],[2787,"R2_EXCITED_9"],
-        [2797,"R2_HEAD_SPIN"],[2813,"R2_HEY_1"],[2824,"R2_HEY_10"],[2828,"R2_HEY_11"],[2833,"R2_HEY_12"],
-        [2841,"R2_HEY_2"],[2856,"R2_HEY_3"],[2861,"R2_HEY_4"],[2882,"R2_HEY_5"],[2893,"R2_HEY_6"],
-        [2898,"R2_HEY_7"],[2904,"R2_HEY_8"],[2912,"R2_HEY_9"],[2919,"R2_LAUGH_1"],[2935,"R2_LAUGH_2"],
-        [2950,"R2_LAUGH_3"],[2955,"R2_LAUGH_4"],[2970,"R2_MOTOR"],[3101,"R2_NEGATIVE_1"],[3111,"R2_NEGATIVE_10"],
-        [3115,"R2_NEGATIVE_11"],[3121,"R2_NEGATIVE_12"],[3132,"R2_NEGATIVE_13"],[3136,"R2_NEGATIVE_14"],[3148,"R2_NEGATIVE_15"],
-        [3152,"R2_NEGATIVE_16"],[3157,"R2_NEGATIVE_17"],[3164,"R2_NEGATIVE_18"],[3167,"R2_NEGATIVE_19"],[3172,"R2_NEGATIVE_2"],
-        [3178,"R2_NEGATIVE_20"],[3191,"R2_NEGATIVE_21"],[3200,"R2_NEGATIVE_22"],[3213,"R2_NEGATIVE_23"],[3219,"R2_NEGATIVE_24"],
-        [3226,"R2_NEGATIVE_25"],[3230,"R2_NEGATIVE_26"],[3233,"R2_NEGATIVE_27"],[3241,"R2_NEGATIVE_28"],[3251,"R2_NEGATIVE_3"],
-        [3258,"R2_NEGATIVE_4"],[3263,"R2_NEGATIVE_5"],[3268,"R2_NEGATIVE_6"],[3274,"R2_NEGATIVE_7"],[3282,"R2_NEGATIVE_8"],
-        [3291,"R2_NEGATIVE_9"],[3302,"R2_POSITIVE_1"],[3309,"R2_POSITIVE_10"],[3318,"R2_POSITIVE_11"],[3326,"R2_POSITIVE_12"],
-        [3340,"R2_POSITIVE_13"],[3353,"R2_POSITIVE_14"],[3358,"R2_POSITIVE_15"],[3364,"R2_POSITIVE_16"],[3369,"R2_POSITIVE_17"],
-        [3375,"R2_POSITIVE_18"],[3388,"R2_POSITIVE_19"],[3394,"R2_POSITIVE_2"],[3403,"R2_POSITIVE_20"],[3410,"R2_POSITIVE_21"],
-        [3422,"R2_POSITIVE_22"],[3434,"R2_POSITIVE_23"],[3439,"R2_POSITIVE_3"],[3446,"R2_POSITIVE_4"],[3449,"R2_POSITIVE_5"],
-        [3454,"R2_POSITIVE_6"],[3460,"R2_POSITIVE_7"],[3471,"R2_POSITIVE_8"],[3478,"R2_POSITIVE_9"],[3484,"R2_SAD_1"],
-        [3495,"R2_SAD_10"],[3518,"R2_SAD_11"],[3526,"R2_SAD_12"],[3536,"R2_SAD_13"],[3543,"R2_SAD_14"],
-        [3553,"R2_SAD_15"],[3561,"R2_SAD_16"],[3570,"R2_SAD_17"],[3593,"R2_SAD_18"],[3600,"R2_SAD_19"],
-        [3608,"R2_SAD_2"],[3612,"R2_SAD_20"],[3619,"R2_SAD_21"],[3632,"R2_SAD_22"],[3639,"R2_SAD_23"],
-        [3649,"R2_SAD_24"],[3661,"R2_SAD_25"],[3686,"R2_SAD_3"],[3693,"R2_SAD_4"],[3703,"R2_SAD_5"],
-        [3739,"R2_SAD_6"],[3755,"R2_SAD_7"],[3782,"R2_SAD_8"],[3790,"R2_SAD_9"],[3797,"R2_SCREAM"],
-        [3810,"R2_SCREAM_2"],[3825,"R2_SHORT_OUT"]
-      ],
-      "R2-Q5": [
-        [3864,"R2Q5_ALARM_1"],[3869,"R2Q5_ALARM_2"],[3875,"R2Q5_CHATTY_1"],[3891,"R2Q5_CHATTY_2"],[3896,"R2Q5_HEY_1"],
-        [3901,"R2Q5_HEY_2"],[3907,"R2Q5_NEGATIVE_1"],[3914,"R2Q5_POSITIVE_1"],[3920,"R2Q5_POSITIVE_2"],[3925,"R2Q5_SAD_1"],
-        [3929,"R2Q5_SHUTDOWN"]
-      ],
-      "BB-9E extra / head turn": [
-        [3941,"BB9E_EXTRA_1","firmware-dependent"],[4021,"BB9E_EXTRA_2","firmware-dependent"],[4246,"BB9E_EXTRA_3","firmware-dependent"],
-        [4568,"BB9E_EXTRA_4","firmware-dependent"],[4929,"BB9E_EXTRA_5","firmware-dependent"],[5156,"BB9E_EXTRA_6","firmware-dependent"],
-        [5315,"BB9E_EXTRA_7","firmware-dependent"],[5441,"BB9E_HEAD_TURN_1","firmware-dependent"],[5483,"BB9E_HEAD_TURN_2","firmware-dependent"],
-        [5513,"BB9E_HEAD_TURN_3","firmware-dependent"]
-      ]
-    };
-
-    const SOUNDS = Object.entries(SOUND_GROUPS).flatMap(([droid, sounds]) => sounds.map(([id, name, note]) => [id, name, droid, note]));
-
-    const state = {
-      device: null,
-      server: null,
-      connectChar: null,
-      handleChar: null,
-      mainChar: null,
-      connected: false,
-      seq: 0,
-      rxBuffer: [],
-      packetQueue: [],
-      isWriting: false,
-      lastDrive: { speed: 0, heading: 0, flags: 0 },
-      joystickActive: false,
-      lastDriveSentAt: 0,
-      keyboard: new Set(),
-      notify: { motorStall: false, battery: false, leg: false },
-      ledThrottle: {}
-    };
-
-    const $ = (id) => document.getElementById(id);
-
-    function log(message, type = "") {
-      const el = $("log");
-      if (!el) return;
-      const ts = new Date().toLocaleTimeString();
-      const prefix = type ? `[${type}] ` : "";
-      el.textContent += `${ts} ${prefix}${message}\n`;
-      el.scrollTop = el.scrollHeight;
+function handleResponse(e) {
+  try {
+    const raw = new Uint8Array(e.target.value.buffer);
+    if (raw.length < 3 || raw[0] !== 0x8D) return;
+    const p = unescapeBytes(raw); if (!p.length) return;
+    const flags = p[0]; let ptr = 1;
+    const isResponse = (flags & 0x01) !== 0;
+    if ((flags & 0x08) !== 0) ptr++; // target
+    if ((flags & 0x10) !== 0) ptr++; // source
+    if (isResponse) {
+      const seq = p[ptr++], err = p[ptr++], data = p.slice(ptr, -1);
+      const req = pendingRequests.get(seq); pendingRequests.delete(seq);
+      if (err !== 0) { log(`ERR seq ${seq}: 0x${err.toString(16)} ${req?.label||''}`, 'bad'); return; }
+      if (req) parseResponse(req, data);
+    } else {
+      const did = p[ptr++], cid = p[ptr++], seq = p[ptr++], data = p.slice(ptr, -1);
+      parseAsync(did, cid, data);
     }
-
-    function setStatus(connected, text) {
-      state.connected = connected;
-      $("statusDot").classList.toggle("ok", connected);
-      $("statusText").textContent = text || (connected ? "Connected" : "Disconnected");
-      $("connectBtn").disabled = connected;
-      $("reconnectBtn").disabled = connected;
-      $("scanMode").disabled = connected;
-      $("disconnectBtn").disabled = !connected;
-
-      document.querySelectorAll("main button, main input, main select, main textarea").forEach((el) => {
-        if (["clearLogBtn", "copyStateBtn"].includes(el.id)) return;
-        el.disabled = !connected;
-      });
+  } catch(err) { log('Response parse error: ' + err.message, 'bad'); }
+}
+function parseResponse(req, data) {
+  const view = new DataView(new Uint8Array(data).buffer);
+  if (req.did===0x13 && req.cid===0x04 && data.length) updateBattery(['CHARGED','CHARGING','NOT CHARGING','OK','LOW','CRITICAL','RESERVED','UNUSED'][data[0]] || 'UNKNOWN');
+  else if (req.did===0x13 && req.cid===0x03 && data.length>=2) { const mv=(data[0]<<8|data[1]); updateBattery((mv/100).toFixed(2)+'V'); log('Battery voltage: '+(mv/100).toFixed(2)+' V'); }
+  else if (req.did===0x13 && req.cid===0x10 && data.length) { updateBattery(data[0]+'%'); log('Battery percent: '+data[0]+'%'); }
+  else if (req.did===0x17 && req.cid===0x14 && data.length>=4) { const v=view.getFloat32(0,false); $('headOut').textContent=v.toFixed(1)+'°'; $('headVal').textContent=Math.round(v)+'°'; $('headSlider').value=clamp(v,-180,180); }
+  else if (req.did===0x17 && req.cid===0x16 && data.length>=4) { const v=view.getFloat32(0,false); $('legPosVal').textContent=v.toFixed(2); $('legPosSlider').value=clamp(v,0,1); }
+  else if (req.label) log(`OK ${req.label}: ${bytesToHex(data)}`);
+}
+function parseAsync(did, cid, data) {
+  if (did===0x18 && cid===0x02) {
+    if (data.length >= 6) {
+      const dv = new DataView(new Uint8Array(data).buffer);
+      const pitch = dv.getInt16(0,false), roll = dv.getInt16(2,false), yaw = dv.getInt16(4,false);
+      $('imuPitch').textContent = pitch + '°'; $('imuRoll').textContent = roll + '°'; $('imuYaw').textContent = yaw + '°';
     }
+  } else if (did===0x18 && cid===0x12) log('Collision: ' + bytesToHex(data), 'warn');
+  else if (did===0x17 && cid===0x26) log('Leg action complete.', 'good');
+  else if (did===0x17 && cid===0x3A) log('Head reset-to-zero event.', 'good');
+  else log(`Async DID ${did.toString(16)} CID ${cid.toString(16)}: ${bytesToHex(data)}`);
+}
+function updateBattery(t){ const el=$('batteryText'); el.textContent='BATT: '+t; el.className='pill ' + (/LOW|CRIT/i.test(t)?'bad':/%|OK|CHARG|V/i.test(t)?'good':''); }
 
-    function initDisabledState() {
-      document.querySelectorAll("main button, main input, main select, main textarea").forEach((el) => {
-        if (["clearLogBtn", "copyStateBtn"].includes(el.id)) return;
-        el.disabled = true;
-      });
-      $("connectBtn").disabled = false;
-      $("reconnectBtn").disabled = false;
-      $("scanMode").disabled = false;
-      $("disconnectBtn").disabled = true;
-    }
+function driveFlags(){ return ($('reverseToggle').checked?1:0) | ($('turboToggle').checked?2:0) | ($('fastTurnToggle').checked?4:0) | ($('driftToggle').checked?32:0); }
+function sendDrive(speed=currentSpeed, heading=Math.round(currentHeading)) { currentSpeed=clamp(Math.round(speed),0,255); currentHeading=((Math.round(heading)%360)+360)%360; $('spdOut').textContent=currentSpeed; $('hdgOut').textContent=currentHeading+'°'; $('headingArrow').style.transform=`rotate(${currentHeading}deg)`; $('headingArrow').style.opacity=currentSpeed>0?1:.35; sendCmd(0x16,0x07,[currentSpeed,...toBytesU16(currentHeading),driveFlags()],'drive'); }
+function emergencyStop(){ currentSpeed=0; sendDrive(0,currentHeading); log('Emergency stop.','warn'); }
+$('stopBtn').onclick=emergencyStop;
+$('resetYawBtn').onclick=()=>sendCmd(0x16,0x06,[],'reset yaw');
+$('speedMax').oninput=e=>{$('speedLabel').textContent=e.target.value; updateKeyboard();};
+['reverseToggle','turboToggle','fastTurnToggle','driftToggle'].forEach(id=>$(id).onchange=()=>{document.body.classList.toggle('reverse',$('reverseToggle').checked); if(currentSpeed>0) sendDrive(currentSpeed,currentHeading);});
 
-    function clamp(n, min, max) {
-      return Math.max(min, Math.min(max, Number(n) || 0));
-    }
+function updateKeyboard(){ if (isJoystickActive) return; let x=0,y=0; if(keys.up)y-=1;if(keys.down)y+=1;if(keys.left)x-=1;if(keys.right)x+=1; const max=+$('speedMax').value; let speed=(x||y)?max:0; let hdg=currentHeading; if(speed){ hdg = Math.atan2(y,x)*180/Math.PI + 90; if(hdg<0) hdg+=360; } if (speed!==lastSpeed || Math.abs(hdg-lastHeading)>1){lastSpeed=speed;lastHeading=hdg;sendDrive(speed,hdg);} }
+const area=$('joystickArea'), nub=$('joystickNub');
+function handleMove(e){ if(!isJoystickActive) return; e.preventDefault(); const r=area.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2; const pt=e.touches?e.touches[0]:e; const dx=pt.clientX-cx, dy=pt.clientY-cy, rad=r.width/2; let dist=Math.hypot(dx,dy), angle=Math.atan2(dy,dx); const limited=Math.min(dist,rad-6); nub.style.transform=`translate(${Math.cos(angle)*limited}px,${Math.sin(angle)*limited}px)`; const dz=rad*.25; let speed=dist<dz?0:Math.round(Math.pow(Math.min(1,(dist-dz)/(rad-dz)),2.4)*+$('speedMax').value); let hdg=angle*180/Math.PI+90; if(hdg<0)hdg+=360; if(Math.abs(speed-lastSpeed)>3 || Math.abs(hdg-lastHeading)>5){lastSpeed=speed;lastHeading=hdg;sendDrive(speed,hdg);} }
+function endJoy(){ if(!isJoystickActive)return; isJoystickActive=false;nub.style.transform='translate(0,0)';sendDrive(0,currentHeading); }
+area.addEventListener('mousedown',e=>{isJoystickActive=true;handleMove(e)}); window.addEventListener('mousemove',handleMove); window.addEventListener('mouseup',endJoy);
+area.addEventListener('touchstart',e=>{isJoystickActive=true;handleMove(e)},{passive:false}); window.addEventListener('touchmove',handleMove,{passive:false}); window.addEventListener('touchend',endJoy);
+window.addEventListener('keydown', e => { if(e.repeat||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return; if(e.key==='Shift'){$('reverseToggle').checked=true;$('reverseToggle').dispatchEvent(new Event('change'));} if(['w','ArrowUp'].includes(e.key)){keys.up=true;$('key-w').classList.add('active')} if(['a','ArrowLeft'].includes(e.key)){keys.left=true;$('key-a').classList.add('active')} if(['s','ArrowDown'].includes(e.key)){keys.down=true;$('key-s').classList.add('active')} if(['d','ArrowRight'].includes(e.key)){keys.right=true;$('key-d').classList.add('active')} if(e.code==='Space'){e.preventDefault(); emergencyStop();} updateKeyboard(); });
+window.addEventListener('keyup', e => { if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return; if(e.key==='Shift'){$('reverseToggle').checked=false;$('reverseToggle').dispatchEvent(new Event('change'));} if(['w','ArrowUp'].includes(e.key)){keys.up=false;$('key-w').classList.remove('active')} if(['a','ArrowLeft'].includes(e.key)){keys.left=false;$('key-a').classList.remove('active')} if(['s','ArrowDown'].includes(e.key)){keys.down=false;$('key-s').classList.remove('active')} if(['d','ArrowRight'].includes(e.key)){keys.right=false;$('key-d').classList.remove('active')} updateKeyboard(); });
 
-    function bytesFromAscii(str) {
-      return [...str].map(c => c.charCodeAt(0));
-    }
+function setLegAction(n){ sendCmd(0x17,0x0D,[n],['leg stop','three-leg','two-leg','waddle'][n]||'leg'); }
+$('headSlider').oninput=e=>{ $('headVal').textContent=e.target.value+'°'; sendCmd(0x17,0x0F,float32Bytes(e.target.value),'set head'); };
+$('headCenterBtn').onclick=()=>{ $('headSlider').value=0; $('headSlider').dispatchEvent(new Event('input')); };
+$('getHeadBtn').onclick=()=>sendCmd(0x17,0x14,[],'get head');
+$('legPosSlider').oninput=e=>{ $('legPosVal').textContent=(+e.target.value).toFixed(2); sendCmd(0x17,0x15,float32Bytes(e.target.value),'set leg position'); };
+$('getLegPosBtn').onclick=()=>sendCmd(0x17,0x16,[],'get leg position');
+$('legNotifyBtn').onclick=()=>{ legNotifyEnabled=!legNotifyEnabled; sendCmd(0x17,0x2A,[legNotifyEnabled?1:0],'leg notify '+legNotifyEnabled); };
 
-    function hexByte(n) {
-      return "0x" + clamp(n, 0, 255).toString(16).padStart(2, "0").toUpperCase();
-    }
+let ledTimer=null; function scheduleLights(){ clearTimeout(ledTimer); ledTimer=setTimeout(applyAllLights,45); }
+function applyAllLights(){ const f=colorBytes($('ledFront').value), r=colorBytes($('ledRear').value), li=+$('logicInt').value, hi=+$('holoInt').value; sendCmd(0x1A,0x0E,[0x00,0x07,...f],'front LEDs'); sendCmd(0x1A,0x0E,[0x00,0x70,...r],'rear LEDs'); sendCmd(0x1A,0x0E,[0x00,0x08,li],'logic brightness'); sendCmd(0x1A,0x0E,[0x00,0x80,hi],'holo brightness'); }
+function lightsOff(){ sendCmd(0x1A,0x0E,[0x00,0x07,0,0,0],'front off'); sendCmd(0x1A,0x0E,[0x00,0x70,0,0,0],'rear off'); sendCmd(0x1A,0x0E,[0x00,0x08,0],'logic off'); sendCmd(0x1A,0x0E,[0x00,0x80,0],'holo off'); }
+['ledFront','ledRear','logicInt','holoInt'].forEach(id=>$(id).oninput=e=>{ if(id==='logicInt')$('logicVal').textContent=e.target.value; if(id==='holoInt')$('holoVal').textContent=e.target.value; scheduleLights(); });
+$('ledApplyBtn').onclick=applyAllLights; $('ledOffBtn').onclick=lightsOff; $('idleLedBtn').onclick=()=>sendCmd(0x1A,0x19,[],'idle LED animation');
 
-    function toHex(bytes) {
-      return Array.from(bytes || []).map(b => Number(b).toString(16).padStart(2, "0").toUpperCase()).join(" ");
-    }
+function updateVolume(v){ v=+v; $('volLabel').textContent=Math.round(v/255*100)+'%'; sendCmd(0x1A,0x08,[v],'volume'); }
+function playSound(id){ const mode=+$('playbackMode').value; sendCmd(0x1A,0x07,[...toBytesU16(id),mode],'sound '+id); }
+function stopAudio(){ sendCmd(0x1A,0x0A,[],'stop audio'); }
+$('masterVolume').oninput=e=>updateVolume(e.target.value); $('playSoundBtn').onclick=()=>{const id=+$('soundSelect').value;if(id)playSound(id)}; $('stopAudioBtn').onclick=stopAudio;
 
-    function parseHexBytes(str) {
-      const clean = str.replace(/,/g, " ").trim();
-      if (!clean) return [];
-      return clean.split(/\s+/).map(part => {
-        const val = Number.parseInt(part.replace(/^0x/i, ""), 16);
-        if (!Number.isFinite(val) || val < 0 || val > 255) throw new Error(`Bad hex byte: ${part}`);
-        return val;
-      });
-    }
+function playAnimation(id){ sendCmd(0x17,0x05,toBytesU16(id),'animation '+id); }
+function stopAnimation(){ sendCmd(0x17,0x2B,[],'stop animation'); }
+$('playAnimBtn').onclick=()=>playAnimation(+$('animSelect').value); $('stopAnimBtn').onclick=stopAnimation;
+$('idleOnBtn').onclick=()=>sendCmd(0x17,0x2C,[1],'idle animations on'); $('idleOffBtn').onclick=()=>sendCmd(0x17,0x2C,[0],'idle animations off');
+$('trophyBtn').onclick=()=>{ trophyEnabled=!trophyEnabled; sendCmd(0x17,0x2D,[trophyEnabled?1:0],'trophy '+trophyEnabled); };
 
-    function u16(n) {
-      n = clamp(n, 0, 0xFFFF);
-      return [(n >> 8) & 0xFF, n & 0xFF];
-    }
+function requestBattery(){ sendCmd(0x13,0x04,[],'battery state'); sendCmd(0x13,0x10,[],'battery percent'); }
+$('batteryBtn').onclick=requestBattery; $('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');
+$('imuBtn').onclick=()=>{ imuEnabled=!imuEnabled; if(imuEnabled) sendCmd(0x18,0x00,[0x00,0xFA,0x00,0x00,0x07,0x00,0x00],'IMU on'); else {sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'IMU off'); $('imuPitch').textContent='0°';$('imuRoll').textContent='0°';$('imuYaw').textContent='0°';} };
+$('collisionBtn').onclick=()=>{ collisionEnabled=!collisionEnabled; if(collisionEnabled){ sendCmd(0x18,0x11,[1,80,80,40,40,80],'configure collision'); sendCmd(0x18,0x14,[1],'collision on'); } else sendCmd(0x18,0x14,[0],'collision off'); };
+$('stabBtn').onclick=()=>sendCmd(0x16,0x0C,[+$('stabSelect').value],'stabilization');
+$('rawSendBtn').onclick=()=>sendCmd(0x16,0x0B,[+$('rawIndex').value,+$('rawMode').value,0,+$('rawSpeed').value],'raw motor');
+$('rawAllOffBtn').onclick=()=>{ for(let i=0;i<4;i++) sendCmd(0x16,0x0B,[i,0,0,0],'raw off'); };
+$('sleepBtn').onclick=()=>sendCmd(0x13,0x01,[],'sleep');
+$('rawCmdBtn').onclick=()=>{ const a=parseHex($('rawCmd').value); if(a.length<2){log('Raw command needs DID CID [DATA...]','bad');return;} sendCmd(a[0],a[1],a.slice(2),'raw user'); };
+$('clearLogBtn').onclick=()=>logEl.innerHTML='';
 
-    function f32be(value) {
-      const buf = new ArrayBuffer(4);
-      new DataView(buf).setFloat32(0, Number(value), false);
-      return Array.from(new Uint8Array(buf));
-    }
+const ANIMS = `
+CHARGER_1,0
+CHARGER_2,1
+CHARGER_3,2
+CHARGER_4,3
+CHARGER_5,4
+CHARGER_6,5
+CHARGER_7,6
+EMOTE_ALARM,7
+EMOTE_ANGRY,8
+EMOTE_ATTENTION,9
+EMOTE_FRUSTRATED,10
+EMOTE_DRIVE,11
+EMOTE_EXCITED,12
+EMOTE_SEARCH,13
+EMOTE_SHORT_CIRCUIT,14
+EMOTE_LAUGH,15
+EMOTE_NO,16
+EMOTE_RETREAT,17
+EMOTE_FIERY,18
+EMOTE_UNDERSTOOD,19
+EMOTE_YES,21
+EMOTE_SCAN,22
+EMOTE_SURPRISED,24
+IDLE_1,25
+IDLE_2,26
+IDLE_3,27
+WWM_ANGRY,31
+WWM_ANXIOUS,32
+WWM_BOW,33
+WWM_CONCERN,34
+WWM_CURIOUS,35
+WWM_DOUBLE_TAKE,36
+WWM_EXCITED,37
+WWM_FIERY,38
+WWM_FRUSTRATED,39
+WWM_HAPPY,40
+WWM_JITTERY,41
+WWM_LAUGH,42
+WWM_LONG_SHAKE,43
+WWM_NO,44
+WWM_OMINOUS,45
+WWM_RELIEVED,46
+WWM_SAD,47
+WWM_SCARED,48
+WWM_SHAKE,49
+WWM_SURPRISED,50
+WWM_TAUNTING,51
+WWM_WHISPER,52
+WWM_YELLING,53
+WWM_YOOHOO,54
+MOTOR,55`;
 
-    function bytesToFloat32BE(bytes, offset = 0) {
-      if (bytes.length < offset + 4) return NaN;
-      const buf = new ArrayBuffer(4);
-      const arr = new Uint8Array(buf);
-      arr.set(bytes.slice(offset, offset + 4));
-      return new DataView(buf).getFloat32(0, false);
-    }
+const SOUND_CSV = `
+TEST_1497HZ,1
+TEST_200HZ,32
+TEST_2517HZ,63
+TEST_3581HZ,94
+TEST_431HZ,125
+TEST_6011HZ,156
+TEST_853HZ,187
+BB8_ALARM_1,218
+BB8_ALARM_10,235
+BB8_ALARM_11,254
+BB8_ALARM_12,258
+BB8_ALARM_2,264
+BB8_ALARM_3,268
+BB8_ALARM_4,272
+BB8_ALARM_6,279
+BB8_ALARM_7,288
+BB8_ALARM_8,296
+BB8_ALARM_9,301
+BB8_BOOT_UP,309
+BB8_BOOR_UP_2,330
+BB8_CHATTY_1,352
+BB8_CHATTY_10,356
+BB8_CHATTY_11,360
+BB8_CHATTY_12,368
+BB8_CHATTY_13,375
+BB8_CHATTY_14,381
+BB8_CHATTY_15,390
+BB8_CHATTY_16,397
+BB8_CHATTY_17,404
+BB8_CHATTY_18,410
+BB8_CHATTY_19,417
+BB8_CHATTY_2,430
+BB8_CHATTY_20,464
+BB8_CHATTY_22,471
+BB8_CHATTY_23,479
+BB8_CHATTY_24,492
+BB8_CHATTY_25,518
+BB8_CHATTY_26,525
+BB8_CHATTY_27,537
+BB8_CHATTY_3,544
+BB8_CHATTY_4,557
+BB8_CHATTY_5,570
+BB8_CHATTY_6,577
+BB8_CHATTY_7,581
+BB8_CHATTY_8,587
+BB8_CHATTY_9,599
+BB8_DONT_KNOW,606
+BB8_EXCITED_1,612
+BB8_EXCITED_2,622
+BB8_EXCITED_3,630
+BB8_EXCITED_4,644
+BB8_HEY_1,671
+BB8_HEY_10,682
+BB8_HEY_11,686
+BB8_HEY_12,690
+BB8_HEY_13,700
+BB8_HEY_2,724
+BB8_HEY_3,732
+BB8_HEY_4,734
+BB8_HEY_5,739
+BB8_HEY_6,743
+BB8_HEY_7,747
+BB8_HEY_8,753
+BB8_HEY_9,757
+BB8_LAUGH_1,761
+BB8_LAUGH_2,764
+BB8_NEGATIVE_1,787
+BB8_NEGATIVE_10,792
+BB8_NEGATIVE_11,802
+BB8_NEGATIVE_12,813
+BB8_NEGATIVE_13,825
+BB8_NEGATIVE_14,831
+BB8_NEGATIVE_15,836
+BB8_NEGATIVE_16,859
+BB8_NEGATIVE_17,867
+BB8_NEGATIVE_18,874
+BB8_NEGATIVE_19,888
+BB8_NEGATIVE_2,896
+BB8_NEGATIVE_20,902
+BB8_NEGATIVE_21,916
+BB8_NEGATIVE_22,927
+BB8_NEGATIVE_23,935
+BB8_NEGATIVE_24,946
+BB8_NEGATIVE_25,953
+BB8_NEGATIVE_26,963
+BB8_NEGATIVE_27,969
+BB8_NEGATIVE_28,983
+BB8_NEGATIVE_29,988
+BB8_NEGATIVE_3,998
+BB8_NEGATIVE_30,1003
+BB8_NEGATIVE_4,1010
+BB8_NEGATIVE_5,1020
+BB8_NEGATIVE_6,1032
+BB8_NEGATIVE_7,1040
+BB8_NEGATIVE_8,1052
+BB8_NEGATIVE_9,1064
+BB8_POSITIVE_1,1077
+BB8_POSITIVE_10,1082
+BB8_POSITIVE_11,1087
+BB8_POSITIVE_12,1092
+BB8_POSITIVE_13,1096
+BB8_POSITIVE_14,1102
+BB8_POSITIVE_15,1109
+BB8_POSITIVE_16,1113
+BB8_POSITIVE_2,1118
+BB8_POSITIVE_3,1123
+BB8_POSITIVE_4,1130
+BB8_POSITIVE_5,1135
+BB8_POSITIVE_6,1138
+BB8_POSITIVE_7,1147
+BB8_POSITIVE_8,1150
+BB8_POSITIVE_9,1157
+BB8_SAD_1,1163
+BB8_SAD_10,1170
+BB8_SAD_11,1178
+BB8_SAD_12,1186
+BB8_SAD_13,1192
+BB8_SAD_14,1199
+BB8_SAD_15,1205
+BB8_SAD_16,1213
+BB8_SAD_17,1220
+BB8_SAD_18,1230
+BB8_SAD_2,1236
+BB8_SAD_3,1240
+BB8_SAD_4,1250
+BB8_SAD_5,1268
+BB8_SAD_6,1275
+BB8_SAD_7,1281
+BB8_SAD_8,1295
+BB8_SAD_9,1303
+BB8_SHORTCUT,1308
+BB8_WOW_1,1324
+BB9E_ALARM_1,1329
+BB9E_ALARM_2,1347
+BB9E_ALARM_3,1363
+BB9E_ALARM_4,1375
+BB9E_ALARM_5,1384
+BB9E_CHATTY_1,1394
+BB9E_CHATTY_2,1408
+BB9E_EXCITED_1,1432
+BB9E_EXCITED_2,1442
+BB9E_EXCITED_3,1463
+BB9E_HEY_1,1476
+BB9E_HEY_2,1486
+BB9E_NEGATIVE_1,1494
+BB9E_NEGATIVE_2,1505
+BB9E_NEGATIVE_3,1516
+BB9E_NEGATIVE_4,1523
+BB9E_POSITIVE_1,1531
+BB9E_POSITIVE_2,1549
+BB9E_POSITIVE_3,1558
+BB9E_POSITIVE_4,1571
+BB9E_POSITIVE_5,1583
+BB9E_SAD_1,1592
+BB9E_SAD_2,1600
+R2_FALL,1609
+R2_HIT_1,1623
+R2_HIT_10,1628
+R2_HIT_11,1635
+R2_HIT_2,1642
+R2_HIT_3,1647
+R2_HIT_4,1653
+R2_HIT_5,1659
+R2_HIT_6,1664
+R2_HIT_7,1669
+R2_HIT_8,1676
+R2_HIT_9,1684
+R2_STEP_1,1690
+R2_STEP_2,1693
+R2_STEP_3,1696
+R2_STEP_4,1698
+R2_STEP_5,1700
+R2_STEP_6,1702
+R2_ACCESS_PANELS,1704
+R2_ALARM_1,1737
+R2_ALARM_10,1747
+R2_ALARM_12,1756
+R2_ALARM_13,1763
+R2_ALARM_14,1771
+R2_ALARM_15,1784
+R2_ALARM_16,1791
+R2_ALARM_2,1809
+R2_ALARM_3,1821
+R2_ALARM_4,1831
+R2_ALARM_5,1835
+R2_ALARM_6,1843
+R2_ALARM_7,1858
+R2_ALARM_8,1867
+R2_ALARM_9,1893
+R2_ANNOYED,1910
+R2_BURNOUT,1915
+R2_CHATTY_1,1950
+R2_CHATTY_10,1959
+R2_CHATTY_11,1966
+R2_CHATTY_12,1977
+R2_CHATTY_13,1987
+R2_CHATTY_14,2002
+R2_CHATTY_15,2007
+R2_CHATTY_16,2010
+R2_CHATTY_17,2019
+R2_CHATTY_18,2028
+R2_CHATTY_19,2039
+R2_CHATTY_2,2061
+R2_CHATTY_20,2072
+R2_CHATTY_21,2080
+R2_CHATTY_22,2085
+R2_CHATTY_23,2095
+R2_CHATTY_24,2105
+R2_CHATTY_25,2121
+R2_CHATTY_26,2132
+R2_CHATTY_27,2143
+R2_CHATTY_28,2157
+R2_CHATTY_29,2170
+R2_CHATTY_3,2174
+R2_CHATTY_30,2184
+R2_CHATTY_31,2188
+R2_CHATTY_32,2198
+R2_CHATTY_33,2202
+R2_CHATTY_34,2211
+R2_CHATTY_35,2221
+R2_CHATTY_36,2232
+R2_CHATTY_37,2241
+R2_CHATTY_38,2253
+R2_CHATTY_39,2264
+R2_CHATTY_4,2276
+R2_CHATTY_40,2285
+R2_CHATTY_41,2292
+R2_CHATTY_42,2307
+R2_CHATTY_43,2322
+R2_CHATTY_44,2332
+R2_CHATTY_45,2344
+R2_CHATTY_46,2357
+R2_CHATTY_47,2368
+R2_CHATTY_48,2377
+R2_CHATTY_49,2387
+R2_CHATTY_5,2399
+R2_CHATTY_50,2413
+R2_CHATTY_51,2424
+R2_CHATTY_52,2439
+R2_CHATTY_53,2452
+R2_CHATTY_54,2457
+R2_CHATTY_55,2463
+R2_CHATTY_56,2474
+R2_CHATTY_57,2492
+R2_CHATTY_58,2509
+R2_CHATTY_59,2519
+R2_CHATTY_6,2524
+R2_CHATTY_60,2535
+R2_CHATTY_61,2543
+R2_CHATTY_62,2554
+R2_CHATTY_7,2562
+R2_CHATTY_8,2572
+R2_CHATTY_9,2579
+R2_ENGAGE_HYPER_DRIVE,2586
+R2_EXCITED_1,2600
+R2_EXCITED_10,2615
+R2_EXCITED_11,2633
+R2_EXCITED_12,2644
+R2_EXCITED_13,2654
+R2_EXCITED_14,2662
+R2_EXCITED_15,2680
+R2_EXCITED_16,2691
+R2_EXCITED_2,2708
+R2_EXCITED_3,2726
+R2_EXCITED_4,2730
+R2_EXCITED_5,2736
+R2_EXCITED_6,2753
+R2_EXCITED_7,2767
+R2_EXCITED_8,2777
+R2_EXCITED_9,2787
+R2_HEAD_SPIN,2797
+R2_HEY_1,2813
+R2_HEY_10,2824
+R2_HEY_11,2828
+R2_HEY_12,2833
+R2_HEY_2,2841
+R2_HEY_3,2856
+R2_HEY_4,2861
+R2_HEY_5,2882
+R2_HEY_6,2893
+R2_HEY_7,2898
+R2_HEY_8,2904
+R2_HEY_9,2912
+R2_LAUGH_1,2919
+R2_LAUGH_2,2935
+R2_LAUGH_3,2950
+R2_LAUGH_4,2955
+R2_MOTOR,2970
+R2_NEGATIVE_1,3101
+R2_NEGATIVE_10,3111
+R2_NEGATIVE_11,3115
+R2_NEGATIVE_12,3121
+R2_NEGATIVE_13,3132
+R2_NEGATIVE_14,3136
+R2_NEGATIVE_15,3148
+R2_NEGATIVE_16,3152
+R2_NEGATIVE_17,3157
+R2_NEGATIVE_18,3164
+R2_NEGATIVE_19,3167
+R2_NEGATIVE_2,3172
+R2_NEGATIVE_20,3178
+R2_NEGATIVE_21,3191
+R2_NEGATIVE_22,3200
+R2_NEGATIVE_23,3213
+R2_NEGATIVE_24,3219
+R2_NEGATIVE_25,3226
+R2_NEGATIVE_26,3230
+R2_NEGATIVE_27,3233
+R2_NEGATIVE_28,3241
+R2_NEGATIVE_3,3251
+R2_NEGATIVE_4,3258
+R2_NEGATIVE_5,3263
+R2_NEGATIVE_6,3268
+R2_NEGATIVE_7,3274
+R2_NEGATIVE_8,3282
+R2_NEGATIVE_9,3291
+R2_POSITIVE_1,3302
+R2_POSITIVE_10,3309
+R2_POSITIVE_11,3318
+R2_POSITIVE_12,3326
+R2_POSITIVE_13,3340
+R2_POSITIVE_14,3353
+R2_POSITIVE_15,3358
+R2_POSITIVE_16,3364
+R2_POSITIVE_17,3369
+R2_POSITIVE_18,3375
+R2_POSITIVE_19,3388
+R2_POSITIVE_2,3394
+R2_POSITIVE_20,3403
+R2_POSITIVE_21,3410
+R2_POSITIVE_22,3422
+R2_POSITIVE_23,3434
+R2_POSITIVE_3,3439
+R2_POSITIVE_4,3446
+R2_POSITIVE_5,3449
+R2_POSITIVE_6,3454
+R2_POSITIVE_7,3460
+R2_POSITIVE_8,3471
+R2_POSITIVE_9,3478
+R2_SAD_1,3484
+R2_SAD_10,3495
+R2_SAD_11,3518
+R2_SAD_12,3526
+R2_SAD_13,3536
+R2_SAD_14,3543
+R2_SAD_15,3553
+R2_SAD_16,3561
+R2_SAD_17,3570
+R2_SAD_18,3593
+R2_SAD_19,3600
+R2_SAD_2,3608
+R2_SAD_20,3612
+R2_SAD_21,3619
+R2_SAD_22,3632
+R2_SAD_23,3639
+R2_SAD_24,3649
+R2_SAD_25,3661
+R2_SAD_3,3686
+R2_SAD_4,3693
+R2_SAD_5,3703
+R2_SAD_6,3739
+R2_SAD_7,3755
+R2_SAD_8,3782
+R2_SAD_9,3790
+R2_SCREAM,3797
+R2_SCREAM_2,3810
+R2_SHORT_OUT,3825
+R2Q5_ALARM_1,3864
+R2Q5_ALARM_2,3869
+R2Q5_CHATTY_1,3875
+R2Q5_CHATTY_2,3891
+R2Q5_HEY_1,3896
+R2Q5_HEY_2,3901
+R2Q5_NEGATIVE_1,3907
+R2Q5_POSITIVE_1,3914
+R2Q5_POSITIVE_2,3920
+R2Q5_SAD_1,3925
+R2Q5_SHUTDOWN,3929
+BB9E_EXTRA_1,3941
+BB9E_EXTRA_2,4021
+BB9E_EXTRA_3,4246
+BB9E_EXTRA_4,4568
+BB9E_EXTRA_5,4929
+BB9E_EXTRA_6,5156
+BB9E_EXTRA_7,5315
+BB9E_HEAD_TURN_1,5441
+BB9E_HEAD_TURN_2,5483
+BB9E_HEAD_TURN_3,5513`;
 
-    function checksum(body) {
-      const sum = body.reduce((acc, b) => (acc + (b & 0xFF)) & 0xFF, 0);
-      return (~sum) & 0xFF;
-    }
+const parseCsv = s => s.trim().split(/\n+/).map(line => { const [name,id]=line.split(','); return {name:name.trim(), id:+id, group:name.split('_')[1]||name, droid:name.startsWith('R2Q5')?'R2Q5':name.startsWith('R2_')?'R2':name.startsWith('BB9E')?'BB9E':name.startsWith('BB8')?'BB8':name.startsWith('TEST')?'TEST':'OTHER'}; });
+const sounds = parseCsv(SOUND_CSV), anims = parseCsv(ANIMS);
+function fillSelect(sel, rows, formatter){ sel.innerHTML=''; rows.forEach(o=>{ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=formatter?formatter(o):`${o.name.replace(/_/g,' ')} · ${o.id}`; sel.appendChild(opt); }); }
+function refreshSoundFilters(){ const moods=[...new Set(sounds.map(s=>s.group))].sort(); $('soundMood').innerHTML='<option value="">All groups</option>'+moods.map(m=>`<option>${m}</option>`).join(''); }
+function refreshSounds(){ const d=$('soundDroid').value, m=$('soundMood').value, q=$('soundFilter').value.toLowerCase(); const rows=sounds.filter(s=>(!d||s.droid===d)&&(!m||s.group===m)&&(!q||s.name.toLowerCase().includes(q)||String(s.id).includes(q))); fillSelect($('soundSelect'), rows); $('soundCount').textContent=`${rows.length}/${sounds.length} sounds`; }
+['soundDroid','soundMood','soundFilter'].forEach(id=>$(id).addEventListener('input', refreshSounds));
+fillSelect($('animSelect'), anims, o=>`${o.name.replace(/_/g,' ')} · ${o.id}`); refreshSoundFilters(); refreshSounds();
 
-    function encodeBody(body) {
-      const out = [];
-      for (const b of body) {
-        if (b === ESC) out.push(ESC, ESC_ESC);
-        else if (b === SOP) out.push(ESC, ESC_SOP);
-        else if (b === EOP) out.push(ESC, ESC_EOP);
-        else out.push(b & 0xFF);
-      }
-      return out;
-    }
-
-    function decodeBody(encoded) {
-      const out = [];
-      for (let i = 0; i < encoded.length; i++) {
-        const b = encoded[i];
-        if (b === ESC) {
-          const next = encoded[++i];
-          if (next === ESC_ESC) out.push(ESC);
-          else if (next === ESC_SOP) out.push(SOP);
-          else if (next === ESC_EOP) out.push(EOP);
-          else out.push(next);
-        } else {
-          out.push(b);
-        }
-      }
-      return out;
-    }
-
-    function buildPacket(did, cid, payload = [], flags = 0x0A) {
-      const seq = state.seq;
-      state.seq = (state.seq + 1) & 0xFF;
-      const body = [flags, did & 0xFF, cid & 0xFF, seq, ...payload.map(b => b & 0xFF)];
-      body.push(checksum(body));
-      return { seq, bytes: new Uint8Array([SOP, ...encodeBody(body), EOP]), body };
-    }
-
-    function parseFrame(fullFrame) {
-      if (!fullFrame.length || fullFrame[0] !== SOP || fullFrame[fullFrame.length - 1] !== EOP) return null;
-      const body = decodeBody(fullFrame.slice(1, -1));
-      if (body.length < 5) return null;
-      const gotChk = body[body.length - 1];
-      const calcChk = checksum(body.slice(0, -1));
-      const flags = body[0];
-      const did = body[1];
-      const cid = body[2];
-      const seq = body[3];
-      const err = body.length >= 6 ? body[4] : null;
-      const data = body.slice(body.length >= 6 ? 5 : 4, -1);
-      return { raw: fullFrame, body, flags, did, cid, seq, err, data, checksumOk: gotChk === calcChk };
-    }
-
-    function buildRequestOptions() {
-      return {
-        acceptAllDevices: true,
-        optionalServices: [UUIDS.mainService, UUIDS.connectService, "battery_service"]
-      };
-    }
-
-    async function preflightBluetooth() {
-      log(`Origin: ${location.origin}`);
-      log(`Secure context: ${window.isSecureContext ? "yes" : "NO"}`);
-      log(`Web Bluetooth API: ${navigator.bluetooth ? "available" : "MISSING"}`);
-
-      if (!window.isSecureContext) {
-        throw new Error("Web Bluetooth requires HTTPS or localhost. Run this from localhost or HTTPS, not file://.");
-      }
-      if (!navigator.bluetooth) {
-        t
+setInterval(()=>{ if(isConnected && currentSpeed>0) sendDrive(currentSpeed,currentHeading); },500);
+setInterval(()=>{ if(isConnected) requestBattery(); },30000);
+log('Ready. Connect your droid, then use STOP if anything feels wrong.');
+</script>
+</body>
+</html>
