@@ -140,11 +140,17 @@ function handleResponse(e){
     if((flags&0x10)!==0)ptr++; // source id
 
     if((flags&0x01)!==0){
+      if(ptr+1>=body.length){log('Short response packet: '+bytesToHex(body),'warn');return}
       const seq=body[ptr++],err=body[ptr++],data=body.slice(ptr),req=pendingRequests.get(seq);
       pendingRequests.delete(seq);
-      if(err!==0){log('ERR seq '+seq+': 0x'+err.toString(16)+' '+(req?.label||''),'bad');return}
+      if(err!==0){
+        const errHex=(typeof err==='number')?err.toString(16):'??';
+        log('ERR seq '+seq+': 0x'+errHex+' '+(req?.label||''),'bad');
+        return;
+      }
       if(req)parseResponse(req,data);
     }else{
+      if(ptr+1>=body.length){log('Short async packet: '+bytesToHex(body),'warn');return}
       const did=body[ptr++],cid=body[ptr++];
       const dataWithPossibleSeq=body.slice(ptr);
       if(!(imuScanDecoded&&did===0x18&&cid===0x02))parseAsync(did,cid,dataWithPossibleSeq);
@@ -167,11 +173,12 @@ function parseFloat32List(data){const dv=new DataView(new Uint8Array(data).buffe
 function plausibleAngles(v){return v.length>=3&&v.slice(0,3).every(n=>Number.isFinite(n)&&Math.abs(n)<1000)}
 function updateImuFromValues(v,source){
   imuFrameCount++;lastImuFrameAt=Date.now();
-  setImuDisplayState('Streaming','good');
+  setImuDisplayState('Streaming #'+imuFrameCount,'good');
   $('imuPitch').textContent=(v[0]||0).toFixed(1)+'°';
   $('imuRoll').textContent=(v[1]||0).toFixed(1)+'°';
   $('imuYaw').textContent=(v[2]||0).toFixed(1)+'°';
-  if(imuFrameCount===1||imuFrameCount%20===0)log('IMU '+source+' frame #'+imuFrameCount+': '+v.slice(0,3).map(n=>n.toFixed(2)).join(', '),'good');
+  // Log the first few frames, then every 10th, so the demo visibly proves continuous streaming.
+  if(imuFrameCount<=5||imuFrameCount%10===0)log('IMU '+source+' frame #'+imuFrameCount+': '+v.slice(0,3).map(n=>n.toFixed(2)).join(', '),'good');
 }
 function decodeR2ImuTokenFloats(data,source){
   // R2-D2 observed packet payload: TOKEN + pitch f32 + roll f32 + yaw f32 + optional trailing bytes.
@@ -204,7 +211,7 @@ function parseImuPayload(data,source){
 }
 function scanForImuFrame(body){
   // Preferred documented async shape after checksum removal: flags, DID 0x18, CID 0x02, token, floats...
-  for(let i=0;i<body.length-15;i++){
+  for(let i=0;i<=body.length-15;i++){
     if(body[i]===0x18&&body[i+1]===0x02){
       if(parseImuPayload(body.slice(i+2),'R2 IMU'))return true;
     }
@@ -219,11 +226,14 @@ function scanForImuFrame(body){
   return false;
 }
 function parseAsync(did,cid,data){
+  if(typeof did!=='number'||typeof cid!=='number'){log('Malformed async packet data: '+bytesToHex(data||[]),'warn');return}
   if(did===0x18&&cid===0x02){
-    if(!parseImuPayload(data,'legacy stream'))log('IMU frame found but payload shape was unexpected: '+bytesToHex(data),'warn');
+    if(!parseImuPayload(data,'R2 async'))log('IMU frame found but payload shape was unexpected: '+bytesToHex(data),'warn');
+  }else if(did===0x18&&cid===0x1A){
+    // Gyro/accelerometer activity notify; not the continuous attitude stream.
+    if(imuEnabled&&data.length)log('Sensor activity notify: '+bytesToHex(data));
   }else if(did===0x18&&cid===0x3D){
     log('Streaming service frame: '+bytesToHex(data));
-    // Token is usually first byte, then packed service data. Try to decode any float triples that appear after it.
     if(data.length>4)parseImuPayload(data.slice(1),'streaming service');
   }else log('Async DID '+did.toString(16)+' CID '+cid.toString(16)+': '+bytesToHex(data))
 }
