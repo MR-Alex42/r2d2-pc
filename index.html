@@ -47,27 +47,80 @@ $('connectBtn').onclick=async()=>{try{if(!navigator.bluetooth)throw new Error('W
 $('disconnectBtn').onclick=async()=>{try{if(isConnected){emergencyStop();lightsOff();stopAudio();stopAnimation();await sleep(150);sendCmd(0x13,0x01,[0,0,0,0,0],'sleep');await sleep(300)}if(bluetoothDevice?.gatt?.connected)await bluetoothDevice.gatt.disconnect()}catch(e){log('Disconnect error: '+e.message,'bad')}finally{onDisconnected()}};
 function onDisconnected(){isConnected=false;controlChar=null;notifyChar=null;packetQueue=[];pendingRequests.clear();setOnline(false);status('OFFLINE','bad');updateBattery('--');imuEnabled=false;log('Disconnected.')}
 function handleResponse(e){try{const raw=new Uint8Array(e.target.value.buffer);if(raw.length<3||raw[0]!==0x8D)return;const p=unescapeBytes(raw);if(!p.length)return;const body=p.slice(0,-1);let imuScanDecoded=false;if(imuEnabled)imuScanDecoded=scanForImuFrame(body);const flags=body[0];let ptr=1;if((flags&0x08)!==0)ptr++;if((flags&0x10)!==0)ptr++;if((flags&0x01)!==0){if(ptr+1>=body.length)return;const seq=body[ptr++],err=body[ptr++],data=body.slice(ptr),req=pendingRequests.get(seq);pendingRequests.delete(seq);if(err!==0){if(req?.label&&/(IMU|battery|voltage|charger)/i.test(req.label))log('ERR seq '+seq+': 0x'+err.toString(16)+' '+req.label,'bad');return}if(req)parseResponse(req,data)}else{if(ptr+1>=body.length)return;const did=body[ptr++],cid=body[ptr++],data=body.slice(ptr);if(!(imuScanDecoded&&did===0x18&&cid===0x02))parseAsync(did,cid,data)}}catch(err){log('Response parse error: '+err.message,'bad')}}
-function parseResponse(req,data){const view=new DataView(new Uint8Array(data).buffer);if(req.did===0x13&&req.cid===0x04&&data.length){batteryState=['CHARGED','CHARGING','NOT CHARGING','OK','LOW','CRITICAL','RESERVED','UNUSED','UNKNOWN'][data[0]]||'UNKNOWN';updateBatteryDisplay()}else if(req.did===0x13&&req.cid===0x03&&data.length){batteryVoltage=parseBatteryVoltageHundredths(data);updateBatteryDisplay()}else if(req.did===0x13&&req.cid===0x10&&data.length){const p=data[0];if(p<=100)batteryPercent=p+'%';updateBatteryDisplay()}else if(req.did===0x13&&req.cid===0x17&&data.length){batteryVoltageState=['UNKNOWN','OK','LOW','CRITICAL'][data[0]]||'UNKNOWN';updateBatteryDisplay()}else if(req.did===0x13&&req.cid===0x1F&&data.length){chargerState=['UNKNOWN','NOT CHARGING','CHARGING','CHARGED'][data[0]]||'UNKNOWN';updateBatteryDisplay()}else if(req.did===0x13&&req.cid===0x25&&data.length>=4){const f=view.getFloat32(0,false);if(Number.isFinite(f)&&f>0&&f<20){batteryVoltage=f.toFixed(2)+'V';updateBatteryDisplay()}}else if(req.did===0x17&&req.cid===0x14&&data.length>=4){const v=view.getFloat32(0,false);$('headOut').textContent=v.toFixed(1)+'°';$('headVal').textContent=Math.round(v)+'°';$('headSlider').value=clamp(v,-180,180)}else if(req.did===0x17&&req.cid===0x16&&data.length>=4){const v=view.getFloat32(0,false);$('legPosVal').textContent=v.toFixed(2);$('legPosSlider').value=clamp(v,0,1)}}
+function parseResponse(req,data){
+  const view=new DataView(new Uint8Array(data).buffer);
+  if(req.did===0x13&&req.cid===0x03&&data.length){
+    batteryVoltage=parseBatteryVoltage(data);
+    updateBatteryDisplay();
+    log('Battery voltage response: '+bytesToHex(data)+' → '+batteryVoltage,'good');
+  }else if(req.did===0x13&&req.cid===0x04&&data.length){
+    batteryState=parseBatteryState(data[0]);
+    chargerState=(batteryState==='CHARGING')?'CHARGING':'DISCONNECTED';
+    updateBatteryDisplay();
+    log('Battery state: '+batteryState,'good');
+  }else if(req.did===0x13&&req.cid===0x10&&data.length){
+    const p=data[0];
+    if(p<=100){batteryPercent=p+'%';log('Battery percent response: '+batteryPercent,'good')}
+    updateBatteryDisplay();
+  }else if(req.did===0x13&&req.cid===0x17&&data.length){
+    batteryVoltageState=parseVoltageState(data[0]);
+    updateBatteryDisplay();
+  }else if(req.did===0x13&&req.cid===0x1F&&data.length){
+    chargerState=parseChargerState(data[0]);
+    updateBatteryDisplay();
+  }else if(req.did===0x13&&req.cid===0x25&&data.length>=4){
+    const f=view.getFloat32(0,false);
+    if(Number.isFinite(f)&&f>0&&f<20){batteryVoltage=f.toFixed(2)+'V';updateBatteryDisplay();log('Calibrated battery volts: '+batteryVoltage,'good')}
+  }else if(req.did===0x17&&req.cid===0x14&&data.length>=4){
+    const v=view.getFloat32(0,false);$('headOut').textContent=v.toFixed(1)+'°';$('headVal').textContent=Math.round(v)+'°';$('headSlider').value=clamp(v,-180,180)
+  }else if(req.did===0x17&&req.cid===0x16&&data.length>=4){
+    const v=view.getFloat32(0,false);$('legPosVal').textContent=v.toFixed(2);$('legPosSlider').value=clamp(v,0,1)
+  }
+}
 function toUIntBE(data){let n=0;for(const b of data)n=(n<<8)|b;return n>>>0}
-function parseBatteryVoltageHundredths(data){const raw=toUIntBE(data);return raw?(raw/100).toFixed(2)+'V':'--'}
-function estimateBatteryPercentFromVoltage(vText){const v=parseFloat(vText);if(!Number.isFinite(v))return'--';const pct=Math.round(clamp((v-3.4)/(4.2-3.4)*100,0,100));return'~'+pct+'%'}
-function updateBatteryDisplay(){if(batteryPercent==='--'&&batteryVoltage!=='--')batteryPercent=estimateBatteryPercentFromVoltage(batteryVoltage);const parts=[];if(batteryPercent!=='--')parts.push(batteryPercent);if(batteryVoltage!=='--')parts.push(batteryVoltage);if(chargerState!=='--')parts.push(chargerState);else if(batteryState!=='--')parts.push(batteryState);else if(batteryVoltageState!=='--')parts.push(batteryVoltageState);updateBattery(parts.length?parts.join(' '):'--')}
+function parseBatteryVoltage(data){
+  if(!data||!data.length)return'--';
+  const u8=new Uint8Array(data),dv=new DataView(u8.buffer);
+  if(u8.length>=4){const f=dv.getFloat32(0,false);if(Number.isFinite(f)&&f>2&&f<12)return f.toFixed(2)+'V'}
+  const raw=toUIntBE(u8);
+  if(raw>=2500&&raw<=6000)return(raw/1000).toFixed(2)+'V';
+  if(raw>=250&&raw<=600)return(raw/100).toFixed(2)+'V';
+  if(raw>=25&&raw<=60)return(raw/10).toFixed(2)+'V';
+  return raw?String(raw):'--';
+}
+function parseBatteryState(v){return ({0:'UNKNOWN',1:'CHARGING',2:'OK',3:'LOW',4:'CRITICAL',5:'UNKNOWN'}[v]||'UNKNOWN')}
+function parseVoltageState(v){return ({0:'UNKNOWN',1:'OK',2:'LOW',3:'CRITICAL'}[v]||'UNKNOWN')}
+function parseChargerState(v){return ({0:'UNKNOWN',1:'DISCONNECTED',2:'CHARGING',3:'CHARGED',4:'DISCONNECTED'}[v]||'UNKNOWN')}
+function estimateBatteryPercentFromVoltage(vText){const v=parseFloat(vText);if(!Number.isFinite(v))return'--';return'~'+Math.round(clamp((v-3.4)/(4.2-3.4)*100,0,100))+'%'}
+function updateBatteryDisplay(){
+  if((batteryPercent==='--'||batteryPercent==='0%')&&batteryVoltage!=='--')batteryPercent=estimateBatteryPercentFromVoltage(batteryVoltage);
+  const charge=(chargerState!=='--')?chargerState:((batteryState==='CHARGING')?'CHARGING':'DISCONNECTED');
+  const power=(batteryVoltageState!=='--')?batteryVoltageState:batteryState;
+  const parts=[]; if(batteryPercent!=='--')parts.push(batteryPercent); if(batteryVoltage!=='--')parts.push(batteryVoltage); if(charge!=='--')parts.push(charge); if(power&&power!=='--'&&power!==charge)parts.push(power);
+  updateBattery(parts.length?parts.join(' '):'--');
+}
 function parseFloat32List(data){const dv=new DataView(new Uint8Array(data).buffer),out=[];for(let i=0;i+3<data.length;i+=4)out.push(dv.getFloat32(i,false));return out}
 function plausibleAngles(v){return v.length>=3&&v.slice(0,3).every(n=>Number.isFinite(n)&&Math.abs(n)<=360)}
 function decodeR2ImuTokenFloats(data,source){if(data.length<13)return false;const token=data[0],v=parseFloat32List(data.slice(1,13));if(!plausibleAngles(v))return false;updateImu(v[0],v[1],v[2],source+' token 0x'+token.toString(16).padStart(2,'0'));return true}
 function parseImuPayload(data,source){if(decodeR2ImuTokenFloats(data,source))return true;if(data.length>=12){const v=parseFloat32List(data.slice(0,12));if(plausibleAngles(v)){updateImu(v[0],v[1],v[2],source+' direct');return true}}return false}
 function scanForImuFrame(body){for(let i=0;i<=body.length-15;i++){if(body[i]===0x18&&body[i+1]===0x02&&parseImuPayload(body.slice(i+2),'R2 IMU'))return true}for(let i=3;i<=body.length-13;i++){if(parseImuPayload(body.slice(i),'R2 raw '+i))return true}return false}
-function parseAsync(did,cid,data){if(did===0x18&&cid===0x02)parseImuPayload(data,'R2 async');else if(did===0x13&&cid===0x06&&data.length){batteryState=['CHARGED','CHARGING','NOT CHARGING','OK','LOW','CRITICAL','RESERVED','UNUSED','UNKNOWN'][data[0]]||'UNKNOWN';updateBatteryDisplay()}else if(did===0x13&&cid===0x1C&&data.length){batteryVoltageState=['UNKNOWN','OK','LOW','CRITICAL'][data[0]]||'UNKNOWN';updateBatteryDisplay()}else if(did===0x13&&data.length){log('Power async CID 0x'+cid.toString(16)+': '+bytesToHex(data))}}
+function parseAsync(did,cid,data){
+  if(did===0x18&&cid===0x02)parseImuPayload(data,'R2 async');
+  else if(did===0x13&&cid===0x06&&data.length){batteryState=parseBatteryState(data[0]);chargerState=(batteryState==='CHARGING')?'CHARGING':'DISCONNECTED';updateBatteryDisplay();log('Battery state notify: '+batteryState,'good')}
+  else if(did===0x13&&cid===0x1C&&data.length){batteryVoltageState=parseVoltageState(data[0]);updateBatteryDisplay();log('Battery voltage state notify: '+batteryVoltageState,'good')}
+  else if(did===0x13&&data.length){log('Power async CID 0x'+cid.toString(16)+': '+bytesToHex(data))}
+}
 function updateImu(pitch,roll,yaw,source=''){pitch=norm180(pitch);roll=norm180(roll);yaw=norm180(yaw);const now=Date.now();imuFrameCount++;lastImuAt=now;imuWindowFrames++;if(!imuWindowStart)imuWindowStart=now;const elapsed=Math.max(1,now-imuWindowStart),hz=imuWindowFrames*1000/elapsed;if(elapsed>3000){imuWindowStart=now;imuWindowFrames=0}$('imuPitch').textContent=pitch.toFixed(1)+'°';$('imuRoll').textContent=roll.toFixed(1)+'°';$('imuYaw').textContent=yaw.toFixed(1)+'°';$('imuState').textContent=(hz>=1?hz.toFixed(1)+'Hz':'Live')+' #'+imuFrameCount;$('imuState').className='good';$('telemetryHint').textContent='Streaming ±180°';imuHistory.pitch.push(pitch);imuHistory.roll.push(roll);imuHistory.yaw.push(yaw);for(const k of ['pitch','roll','yaw'])while(imuHistory[k].length>IMU_HISTORY_MAX)imuHistory[k].shift();drawImuScope();if(imuFrameCount<=3||imuFrameCount%50===0)log('IMU '+source+' #'+imuFrameCount+': '+[pitch,roll,yaw].map(n=>n.toFixed(1)).join(', ')+' @ '+hz.toFixed(1)+'Hz','good')}
 function drawImuScope(){const c=$('imuScope');if(!c)return;const wrap=c.parentElement,w=Math.max(80,wrap.clientWidth),h=Math.max(80,wrap.clientHeight);if(c.width!==w||c.height!==h){c.width=w;c.height=h;IMU_HISTORY_MAX=Math.max(120,Math.floor(w/2));for(const k of ['pitch','roll','yaw'])while(imuHistory[k].length>IMU_HISTORY_MAX)imuHistory[k].shift()}const ctx=c.getContext('2d');ctx.fillStyle='#020911';ctx.fillRect(0,0,w,h);ctx.strokeStyle='rgba(57,230,255,.10)';ctx.lineWidth=1;for(let x=w-1;x>=0;x-=20){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}for(let i=0;i<=6;i++){const y=h*i/6;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}const mid=h/2,scale=(h*.46)/180;ctx.strokeStyle='rgba(255,255,255,.20)';ctx.beginPath();ctx.moveTo(0,mid);ctx.lineTo(w,mid);ctx.stroke();[['pitch','#39e6ff'],['roll','#ffd166'],['yaw','#ff5bc8']].forEach(([key,color])=>{const arr=imuHistory[key];if(arr.length<2)return;ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();arr.forEach((v,i)=>{const x=w-(arr.length-1-i)*2-2,y=mid-v*scale;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke()});ctx.fillStyle='#9edff2';ctx.font='11px monospace';ctx.fillText('+180°',6,12);ctx.fillText('+90°',6,mid-h*.23);ctx.fillText('0°',6,mid-4);ctx.fillText('-90°',6,mid+h*.23);ctx.fillText('-180°',6,h-6);ctx.fillStyle=(Date.now()-lastImuAt<1200)?'#6dff9a':'#ffd166';ctx.fillText((Date.now()-lastImuAt<1200)?'LIVE':'WAIT',w-38,12)}
 function refreshTelemetryUi(){
   $('batPct').textContent=batteryPercent;
   $('batVolt').textContent=batteryVoltage;
-  const charge=(chargerState!=='--')?chargerState:(/CHARG/i.test(batteryState)?batteryState:'DISCONNECTED');
+  const charge=(chargerState!=='--')?chargerState:((batteryState==='CHARGING')?'CHARGING':'DISCONNECTED');
   $('chargeOut').textContent=charge;
   $('chargeOut').className=/CHARGING|CHARGED/i.test(charge)?'good':(/DISCONNECTED|NOT CHARGING/i.test(charge)?'warn':'');
-  $('powerOut').textContent=(batteryVoltageState!=='--')?batteryVoltageState:batteryState;
-  $('powerOut').className=/LOW|CRITICAL/i.test($('powerOut').textContent)?'bad':(/OK|CHARG/i.test($('powerOut').textContent)?'good':'');
+  const power=(batteryVoltageState!=='--')?batteryVoltageState:batteryState;
+  $('powerOut').textContent=power;
+  $('powerOut').className=/LOW|CRITICAL/i.test(power)?'bad':(/OK|CHARG/i.test(power)?'good':'');
   $('volOut').textContent=Math.round((+$('masterVolume').value||0)/255*100)+'%';
   $('frontOut').textContent=$('ledFront').value.toUpperCase();
   $('rearOut').textContent=$('ledRear').value.toUpperCase();
@@ -86,13 +139,14 @@ function applyAllLights(){sendCmd(0x1A,0x0E,[0,7,...colorBytes($('ledFront').val
 function updateVolume(v){$('volLabel').textContent=Math.round(+v/255*100)+'%';refreshTelemetryUi();sendCmd(0x1A,0x08,[+v],'volume')}function playSound(id){sendCmd(0x1A,0x07,[...toBytesU16(+id),0],'sound '+id)}function stopAudio(){sendCmd(0x1A,0x0A,[],'stop audio')}$('masterVolume').oninput=e=>updateVolume(e.target.value);$('playSoundBtn').onclick=()=>playSound($('soundSelect').value);$('playSoundIdBtn').onclick=()=>playSound($('soundId').value);$('stopAudioBtn').onclick=stopAudio;
 function playAnimation(id){sendCmd(0x17,0x05,toBytesU16(+id),'animation '+id)}function stopAnimation(){sendCmd(0x17,0x2B,[],'stop animation')}$('playAnimBtn').onclick=()=>playAnimation($('animSelect').value);$('stopAnimBtn').onclick=stopAnimation;$('idleOnBtn').onclick=()=>sendCmd(0x17,0x2C,[1],'idle on');$('idleOffBtn').onclick=()=>sendCmd(0x17,0x2C,[0],'idle off');$('trophyBtn').onclick=()=>{trophyEnabled=!trophyEnabled;sendCmd(0x17,0x2D,[trophyEnabled?1:0],'trophy '+trophyEnabled);if(trophyEnabled)setTimeout(()=>playSound(3302),300)};
 function requestBattery(){
+  log('Requesting Sphero Power API battery values…');
   sendCmd(0x13,0x0C,[],'force battery refresh');
-  setTimeout(()=>sendCmd(0x13,0x03,[],'battery voltage hundredths'),120);
-  setTimeout(()=>sendCmd(0x13,0x25,[0x00],'battery volts calibrated'),240);
-  setTimeout(()=>sendCmd(0x13,0x10,[],'battery percent internal'),360);
-  setTimeout(()=>sendCmd(0x13,0x04,[],'battery state'),480);
-  setTimeout(()=>sendCmd(0x13,0x17,[],'battery voltage state'),600);
-  setTimeout(()=>sendCmd(0x13,0x1F,[],'charger state'),760);
+  setTimeout(()=>sendCmd(0x13,0x03,[],'battery voltage'),140);
+  setTimeout(()=>sendCmd(0x13,0x10,[],'battery percent'),300);
+  setTimeout(()=>sendCmd(0x13,0x04,[],'battery state'),460);
+  setTimeout(()=>sendCmd(0x13,0x17,[],'battery voltage state'),620);
+  setTimeout(()=>sendCmd(0x13,0x1F,[],'charger state'),780);
+  setTimeout(()=>sendCmd(0x13,0x25,[0x00],'battery volts calibrated'),940);
   refreshTelemetryUi();
 }
 $('batteryBtn').onclick=requestBattery;$('voltageBtn').onclick=()=>{sendCmd(0x13,0x03,[],'battery voltage hundredths');setTimeout(()=>sendCmd(0x13,0x25,[0x00],'battery volts calibrated'),140)};$('wakeBtn').onclick=()=>sendCmd(0x13,0x0D,[],'wake');
@@ -173,69 +227,4 @@ BB8_NEGATIVE_13,825
 BB8_NEGATIVE_14,831
 BB8_NEGATIVE_15,836
 BB8_NEGATIVE_16,859
-BB8_NEGATIVE_17,867
-BB8_NEGATIVE_18,874
-BB8_NEGATIVE_19,888
-BB8_NEGATIVE_2,896
-BB8_NEGATIVE_20,902
-BB8_NEGATIVE_21,916
-BB8_NEGATIVE_22,927
-BB8_NEGATIVE_23,935
-BB8_NEGATIVE_24,946
-BB8_NEGATIVE_25,953
-BB8_NEGATIVE_26,963
-BB8_NEGATIVE_27,969
-BB8_NEGATIVE_28,983
-BB8_NEGATIVE_29,988
-BB8_NEGATIVE_3,998
-BB8_NEGATIVE_30,1003
-BB8_NEGATIVE_4,1010
-BB8_NEGATIVE_5,1020
-BB8_NEGATIVE_6,1032
-BB8_NEGATIVE_7,1040
-BB8_NEGATIVE_8,1052
-BB8_NEGATIVE_9,1064
-BB8_POSITIVE_1,1077
-BB8_POSITIVE_10,1082
-BB8_POSITIVE_11,1087
-BB8_POSITIVE_12,1092
-BB8_POSITIVE_13,1096
-BB8_POSITIVE_14,1102
-BB8_POSITIVE_15,1109
-BB8_POSITIVE_16,1113
-BB8_POSITIVE_2,1118
-BB8_POSITIVE_3,1123
-BB8_POSITIVE_4,1130
-BB8_POSITIVE_5,1135
-BB8_POSITIVE_6,1138
-BB8_POSITIVE_7,1147
-BB8_POSITIVE_8,1150
-BB8_POSITIVE_9,1157
-BB8_SAD_1,1163
-BB8_SAD_10,1170
-BB8_SAD_11,1178
-BB8_SAD_12,1186
-BB8_SAD_13,1192
-BB8_SAD_14,1199
-BB8_SAD_15,1205
-BB8_SAD_16,1213
-BB8_SAD_17,1220
-BB8_SAD_18,1230
-BB8_SAD_2,1236
-BB8_SAD_3,1240
-BB8_SAD_4,1250
-BB8_SAD_5,1268
-BB8_SAD_6,1275
-BB8_SAD_7,1281
-BB8_SAD_8,1295
-BB8_SAD_9,1303
-BB8_SHORTCUT,1308
-BB8_WOW_1,1324
-BB9E_ALARM_1,1329
-BB9E_ALARM_2,1347
-BB9E_ALARM_3,1363
-BB9E_ALARM_4,1375
-BB9E_ALARM_5,1384
-BB9E_CHATTY_1,1394
-BB9E_CHATTY_2,1408
-BB9E_EXCI
+BB8_NEGATIVE_17
