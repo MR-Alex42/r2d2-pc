@@ -303,7 +303,14 @@
       </div>
       <div class="row">
         <span class="pill"><span id="statusDot" class="dot"></span><span id="statusText">Disconnected</span></span>
+        <select id="scanMode" title="Bluetooth scan mode" style="max-width:240px">
+          <option value="r2d2" selected>Scan D2/R2 names</option>
+          <option value="starwars">Scan all Star Wars droids</option>
+          <option value="service">Scan Sphero service UUID</option>
+          <option value="all">Show all BLE devices</option>
+        </select>
         <button id="connectBtn">Connect R2-D2</button>
+        <button id="reconnectBtn" class="secondary">Reconnect remembered</button>
         <button id="disconnectBtn" class="secondary" disabled>Disconnect</button>
       </div>
     </div>
@@ -391,7 +398,7 @@
           <button id="batteryBtn" class="secondary">Read battery</button>
           <button id="volumeReadBtn" class="secondary">Read volume</button>
         </div>
-        <p class="tiny muted">Serve this file from <span class="kbd">https://</span> or <span class="kbd">localhost</span>. Chrome/Edge desktop or Android Chrome are the best targets for Web Bluetooth.</p>
+        <p class="tiny muted">Serve this file from <span class="kbd">https://</span> or <span class="kbd">localhost</span>. Chrome/Edge desktop or Android Chrome are the best targets for Web Bluetooth. R2-D2 usually advertises as <span class="kbd">D2-...</span>; if that does not appear, try <span class="kbd">Show all BLE devices</span>.</p>
       </div>
 
       <div class="card half">
@@ -798,10 +805,12 @@
       $("statusDot").classList.toggle("ok", connected);
       $("statusText").textContent = text || (connected ? "Connected" : "Disconnected");
       $("connectBtn").disabled = connected;
+      $("reconnectBtn").disabled = connected;
+      $("scanMode").disabled = connected;
       $("disconnectBtn").disabled = !connected;
       document.querySelectorAll("main button, main input, main select, main textarea").forEach((el) => {
         if (["clearLogBtn", "copyStateBtn"].includes(el.id)) return;
-        if (!connected && el.id !== "connectBtn") el.disabled = true;
+        if (!connected && !["connectBtn", "reconnectBtn", "scanMode"].includes(el.id)) el.disabled = true;
         if (connected) el.disabled = false;
       });
     }
@@ -812,7 +821,9 @@
         el.disabled = true;
       });
       $("connectBtn").disabled = false;
-      $("disconnectBtn").disabled = true;
+      $("reconnectBtn").disabled = false;
+      $("scanMode").disabled = false;
+      $("
     }
 
     function clamp(n, min, max) {
@@ -927,24 +938,4 @@
       return { raw: fullFrame, body, flags, did, cid, seq, err, data, checksumOk: gotChk === calcChk };
     }
 
-    async function writeCharacteristic(characteristic, bytes) {
-      const data = new Uint8Array(bytes);
-      if (characteristic.writeValueWithoutResponse) {
-        await characteristic.writeValueWithoutResponse(data);
-      } else {
-        await characteristic.writeValue(data);
-      }
-    }
-
-    function requireConnected() {
-      if (!state.connected || !state.mainChar) throw new Error("Not connected to R2-D2");
-    }
-
-    function sendCommand(did, cid, payload = [], options = {}) {
-      const wait = options.wait ?? true;
-      const timeoutMs = options.timeoutMs ?? 2200;
-      const quiet = options.quiet ?? false;
-
-      state.txQueue = state.txQueue.then(async () => {
-        requireConnected();
-        const packet = buildPacket(did, cid, paylo
+    asyn
