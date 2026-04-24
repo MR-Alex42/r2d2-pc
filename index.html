@@ -1,738 +1,88 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>R2-D2 Sphero Full Droid Console</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>R2-D2 Sphero Boss Demo Stable</title>
 <style>
-  :root{
-    --bg:#07111f; --panel:#0d1b2d; --panel2:#111f33; --cyan:#39e6ff; --blue:#5aa8ff; --pink:#ff5bc8;
-    --amber:#ffd166; --red:#ff4d6d; --green:#60f29d; --muted:#6b87a4; --line:#1f6b86;
-  }
-  *{box-sizing:border-box} html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--cyan);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;user-select:none}
-  body:before{content:"";position:fixed;inset:0;background-image:linear-gradient(rgba(57,230,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(57,230,255,.055) 1px,transparent 1px),radial-gradient(circle at 50% 5%,rgba(0,140,255,.18),transparent 38%);background-size:34px 34px,34px 34px,100% 100%;pointer-events:none}
-  button,input,select{font:inherit} button{cursor:pointer} button:disabled{opacity:.45;cursor:not-allowed}
-  .app{position:relative;height:100vh;padding:7px;display:grid;grid-template-rows:48px 1fr 24px;gap:6px}
-  header{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;border:1px solid var(--line);background:rgba(7,17,31,.78);border-radius:12px;padding:6px 8px;box-shadow:0 0 22px rgba(57,230,255,.14)}
-  h1{font-size:18px;letter-spacing:.16em;margin:0;color:white;text-shadow:0 0 12px var(--cyan)}
-  .sub{font-size:9px;color:var(--muted);letter-spacing:.08em;margin-top:2px}.status{font-size:10px;color:var(--amber);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:41vw}.pill{border:1px solid var(--line);background:#081426;border-radius:999px;padding:4px 8px;font-size:10px;white-space:nowrap}.good{color:var(--green)}.bad{color:var(--red)}.warn{color:var(--amber)}
-  .btn{border:1px solid #2c9ab9;background:#0b3f58;color:#dffbff;border-radius:8px;padding:7px 9px;text-transform:uppercase;font-weight:800;font-size:10px;letter-spacing:.06em}.btn:hover{filter:brightness(1.18)}.btn.red{border-color:#aa3351;background:#491525;color:#ffe8ee}.btn.pink{border-color:#b33c93;background:#42163b;color:#ffd7f4}.btn.blue{border-color:#2b75c7;background:#12335f;color:#e1efff}.btn.green{border-color:#209958;background:#123d2b;color:#dfffea}.btn.amber{border-color:#b58b27;background:#40310f;color:#fff4d0}.btn.ghost{background:#071426;border-color:#224c66;color:#9bdff2}
-  main{min-height:0;display:grid;grid-template-columns:1.05fr .95fr 1.05fr 1fr;grid-template-rows:1.05fr .95fr .88fr;gap:6px;opacity:.52;pointer-events:none;transition:.25s}.online main{opacity:1;pointer-events:auto}
-  section{min-width:0;min-height:0;border:1px solid rgba(57,230,255,.25);background:rgba(13,27,45,.72);border-radius:12px;padding:7px;box-shadow:inset 0 0 20px rgba(57,230,255,.035)}
-  .span2{grid-column:span 2}.span3{grid-column:span 3}.row2{grid-row:span 2}.title{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:5px;color:#b7f6ff;font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:.12em}.hint{font-size:8px;color:var(--muted);font-weight:600;letter-spacing:0;text-transform:none}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:5px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.stack{display:flex;flex-direction:column;gap:5px}.row{display:flex;align-items:center;gap:5px}.grow{flex:1}.right{text-align:right}.tiny{font-size:8px;color:var(--muted)}
-  label{font-size:8px;color:#8dcbe3;text-transform:uppercase;font-weight:900;letter-spacing:.05em} select,input[type=text],input[type=number]{width:100%;background:#061323;color:#dffbff;border:1px solid #1f5770;border-radius:7px;padding:6px;font-size:10px;outline:none} select:focus,input:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(57,230,255,.25)} input[type=range]{width:100%;accent-color:var(--cyan)} input[type=color]{width:100%;height:28px;background:#061323;border:1px solid #1f5770;border-radius:7px;padding:2px}.check{display:flex;align-items:center;gap:4px;font-size:8px;color:#a6cfe1;text-transform:uppercase}.check input{accent-color:var(--cyan)}
-  .drive{display:grid;grid-template-columns:122px 1fr;gap:8px;height:calc(100% - 18px)}.pad{align-self:center;justify-self:center;width:116px;height:116px;border:3px solid #0f6b83;border-radius:999px;background:#061323;position:relative;touch-action:none;box-shadow:inset 0 0 22px rgba(57,230,255,.1)}.nub{position:absolute;left:50%;top:50%;width:25px;height:25px;margin:-12.5px 0 0 -12.5px;border-radius:999px;background:var(--cyan);box-shadow:0 0 18px var(--cyan);pointer-events:none}.arrow{position:absolute;inset:0;transform:rotate(0deg);opacity:.35;pointer-events:none}.arrow:before{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%);border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:14px solid var(--cyan)}.reverse .arrow:before{border-bottom-color:var(--red)}.keys{display:grid;grid-template-columns:30px 30px 30px;gap:4px;justify-content:center}.key{height:30px;border:1px solid #1f5770;border-radius:7px;background:#061323;display:flex;align-items:center;justify-content:center;font-weight:900}.key.active{background:#087993;color:white;border-color:var(--cyan);box-shadow:0 0 14px rgba(57,230,255,.65)}.metric{background:#061323;border:1px solid #16445a;border-radius:8px;padding:5px;text-align:center}.metric b{display:block;color:white;font-size:15px;margin-top:2px}.log{height:100%;overflow:hidden;background:#030b14;border:1px solid #17465a;border-radius:8px;padding:5px;font-size:9px;color:#9fc8d6;line-height:1.32}.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.warning{display:none;position:absolute;left:7px;right:7px;top:62px;z-index:5;border:1px solid #b03752;background:#3c1021;color:#ffe7ee;border-radius:10px;padding:8px;font-size:10px}.show{display:block}.kbd{padding:1px 4px;border:1px solid #295c72;border-radius:4px;background:#071426;color:#b7f6ff}.hidden{display:none!important}
-  @media(max-width:980px){.app{transform-origin:top left;transform:scale(.86);width:116.3vw;height:116.3vh}header{grid-template-columns:1fr auto auto}.status{max-width:34vw}.hide-sm{display:none}.grid4{grid-template-columns:repeat(2,1fr)}}
+:root{--bg:#08111f;--p:#0d1c30;--p2:#071426;--c:#39e6ff;--g:#6dff9a;--r:#ff4d6d;--a:#ffd166;--m:#7892aa;--b:#5aa8ff;--pink:#ff5bc8}*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--c);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;user-select:none}body:before{content:"";position:fixed;inset:0;background:linear-gradient(rgba(57,230,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(57,230,255,.05) 1px,transparent 1px);background-size:34px 34px;pointer-events:none}.app{height:100vh;padding:8px;display:grid;grid-template-rows:48px 1fr 26px;gap:6px}header{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:7px;border:1px solid #1f6b86;border-radius:12px;background:rgba(7,20,38,.9);padding:6px 8px}h1{font-size:18px;margin:0;color:white;letter-spacing:.16em;text-shadow:0 0 12px var(--c)}.sub{font-size:9px;color:var(--m)}.status{font-size:10px;color:var(--a);max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pill{border:1px solid #1f6b86;border-radius:99px;padding:4px 8px;font-size:10px;background:#061323}.btn{border:1px solid #2c9ab9;background:#0b3f58;color:#e9fdff;border-radius:8px;padding:7px 9px;text-transform:uppercase;font-weight:900;font-size:10px;letter-spacing:.06em;cursor:pointer}.btn:hover{filter:brightness(1.18)}.red{border-color:#aa3351;background:#491525;color:#ffe8ee}.blue{border-color:#2b75c7;background:#12335f}.pink{border-color:#b33c93;background:#42163b}.amber{border-color:#b58b27;background:#40310f;color:#fff4d0}.ghost{background:#071426;border-color:#224c66;color:#9bdff2}.good{color:var(--g)}.bad{color:var(--r)}.warn{color:var(--a)}main{display:grid;grid-template-columns:1.05fr 1fr 1.1fr 1fr;grid-template-rows:1.05fr .95fr .9fr;gap:6px;min-height:0;opacity:.5;pointer-events:none}.online main{opacity:1;pointer-events:auto}section{min-width:0;min-height:0;border:1px solid rgba(57,230,255,.25);border-radius:12px;background:rgba(13,28,48,.78);padding:7px}.row2{grid-row:span 2}.span2{grid-column:span 2}.title{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:#c1f8ff;margin-bottom:6px}.hint{font-size:8px;color:var(--m);letter-spacing:0;text-transform:none}.row{display:flex;align-items:center;gap:5px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:5px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.stack{display:flex;flex-direction:column;gap:5px}.grow{flex:1}label{font-size:8px;color:#96d7ee;text-transform:uppercase;font-weight:900}select,input[type=text],input[type=number]{width:100%;background:#061323;color:#e9fdff;border:1px solid #1f5770;border-radius:7px;padding:6px;font-size:10px}input[type=range]{width:100%;accent-color:var(--c)}input[type=color]{width:100%;height:28px;border:1px solid #1f5770;border-radius:7px;background:#061323}.drive{height:calc(100% - 18px);display:grid;grid-template-columns:122px 1fr;gap:8px}.pad{align-self:center;justify-self:center;width:116px;height:116px;border:3px solid #0f6b83;border-radius:999px;background:#061323;position:relative;touch-action:none}.nub{position:absolute;left:50%;top:50%;width:25px;height:25px;margin:-12.5px 0 0 -12.5px;border-radius:50%;background:var(--c);box-shadow:0 0 18px var(--c);pointer-events:none}.arrow{position:absolute;inset:0;opacity:.35;pointer-events:none}.arrow:before{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%);border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:14px solid var(--c)}.reverse .arrow:before{border-bottom-color:var(--r)}.keys{display:grid;grid-template-columns:30px 30px 30px;gap:4px;justify-content:center}.key{height:30px;border:1px solid #1f5770;border-radius:7px;background:#061323;display:grid;place-items:center;font-weight:900}.key.active{background:#087993;color:white;border-color:var(--c);box-shadow:0 0 14px rgba(57,230,255,.65)}.metric{background:#061323;border:1px solid #16445a;border-radius:8px;padding:5px;text-align:center}.metric b{display:block;color:white;font-size:15px;margin-top:2px}.check{display:flex;align-items:center;gap:4px;font-size:8px;color:#a6cfe1;text-transform:uppercase}.log{height:100%;overflow:hidden;background:#030b14;border:1px solid #17465a;border-radius:8px;padding:5px;font-size:9px;color:#b4d9e7;line-height:1.32}.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hidden{display:none!important}.tiny{font-size:8px;color:var(--m)}.kbd{padding:1px 4px;border:1px solid #295c72;border-radius:4px;background:#071426;color:#b7f6ff}@media(max-width:980px){.app{transform-origin:top left;transform:scale(.86);width:116.3vw;height:116.3vh}.grid4{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-<div class="app" id="app">
-  <header>
-    <div><h1>ASTROMECH LINK</h1><div class="sub">FULL R2-D2 / R2-Q5 SPHERO V2 CONSOLE · single-file Web Bluetooth</div></div>
-    <div class="status" id="statusText">STATUS: standby. Use Chrome/Edge with Bluetooth.</div>
-    <div class="pill" id="batteryText">BATT: --</div>
-    <div class="row">
-      <button class="btn" id="connectBtn">Connect</button>
-      <button class="btn red hidden" id="disconnectBtn">Disconnect</button>
-    </div>
-  </header>
-
-  <div class="warning" id="sandboxWarning">⚠️ Web Bluetooth is blocked here. Save this as a local .html file or serve it from HTTPS/localhost, then open in Chrome/Edge.</div>
-
-  <main id="controlPanel">
-    <section class="row2">
-      <div class="title">Drive <span class="hint">WASD/Arrows + joystick</span></div>
-      <div class="drive">
-        <div id="joystickArea" class="pad">
-          <div id="headingArrow" class="arrow"></div><div id="joystickNub" class="nub"></div>
-        </div>
-        <div class="stack">
-          <div class="keys"><div></div><div id="key-w" class="key">W</div><div></div><div id="key-a" class="key">A</div><div id="key-s" class="key">S</div><div id="key-d" class="key">D</div></div>
-          <div class="grid2"><button class="btn red" id="stopBtn">STOP</button><button class="btn amber" id="resetYawBtn">Reset Yaw</button></div>
-          <label>Max speed <span id="speedLabel" class="right">80</span></label><input id="speedMax" type="range" min="10" max="255" value="80" />
-          <div class="grid2"><div class="metric">Speed<b id="spdOut">0</b></div><div class="metric">Heading<b id="hdgOut">0°</b></div></div>
-          <div class="grid2">
-            <label class="check"><input id="reverseToggle" type="checkbox"> Reverse <span class="kbd">Shift</span></label>
-            <label class="check"><input id="turboToggle" type="checkbox"> Turbo</label>
-            <label class="check"><input id="fastTurnToggle" type="checkbox"> Fast turn</label>
-            <label class="check"><input id="driftToggle" type="checkbox"> Drift</label>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section>
-      <div class="title">Animatronic Body <span class="hint">legs/head</span></div>
-      <div class="grid4">
-        <button class="btn ghost" onclick="setLegAction(0)">Leg Stop</button><button class="btn" onclick="setLegAction(1)">3-Leg</button><button class="btn" onclick="setLegAction(2)">2-Leg</button><button class="btn blue" onclick="setLegAction(3)">Waddle</button>
-      </div>
-      <div class="grid2" style="margin-top:6px">
-        <div><label>Head angle <span id="headVal">0°</span></label><input id="headSlider" type="range" min="-180" max="180" value="0" /></div>
-        <div><label>Leg position <span id="legPosVal">0.00</span></label><input id="legPosSlider" type="range" min="0" max="1" step="0.01" value="0" /></div>
-      </div>
-      <div class="grid4" style="margin-top:6px">
-        <button class="btn ghost" id="headCenterBtn">Head 0</button><button class="btn ghost" id="getHeadBtn">Get Head</button><button class="btn ghost" id="getLegPosBtn">Get Leg</button><button class="btn ghost" id="legNotifyBtn">Leg Notify</button>
-      </div>
-    </section>
-
-    <section>
-      <div class="title">Optics <span class="hint">all R2 LEDs</span></div>
-      <div class="grid2">
-        <div><label>Front logic RGB</label><input type="color" id="ledFront" value="#00aaff"></div>
-        <div><label>Rear logic RGB</label><input type="color" id="ledRear" value="#ff0000"></div>
-        <div><label>Logic brightness <span id="logicVal">255</span></label><input type="range" id="logicInt" min="0" max="255" value="255"></div>
-        <div><label>Holo projector <span id="holoVal">0</span></label><input type="range" id="holoInt" min="0" max="255" value="0"></div>
-      </div>
-      <div class="grid3" style="margin-top:6px"><button class="btn ghost" id="ledApplyBtn">Apply</button><button class="btn ghost" id="idleLedBtn">Idle LEDs</button><button class="btn red" id="ledOffBtn">Lights Off</button></div>
-    </section>
-
-    <section>
-      <div class="title">Audio Library <span class="hint" id="soundCount">0 sounds</span></div>
-      <div class="grid3"><select id="soundDroid"><option value="">All droids</option><option>R2</option><option>R2Q5</option><option>BB8</option><option>BB9E</option><option>TEST</option></select><select id="soundMood"><option value="">All groups</option></select><input type="text" id="soundFilter" placeholder="filter sounds..." /></div>
-      <div class="row" style="margin-top:5px"><select id="soundSelect" class="grow"></select><button class="btn pink" id="playSoundBtn">Play</button><button class="btn red" id="stopAudioBtn">Stop</button></div>
-      <div class="grid2" style="margin-top:5px"><div><label>Volume <span id="volLabel">50%</span></label><input id="masterVolume" type="range" min="0" max="255" value="128"></div><div><label>Playback</label><select id="playbackMode"><option value="0">Immediate</option><option value="1">Only if idle</option><option value="2">Queue after current</option></select></div></div>
-    </section>
-
-    <section>
-      <div class="title">Routines <span class="hint">animations</span></div>
-      <div class="row"><select id="animSelect" class="grow"></select><button class="btn blue" id="playAnimBtn">Play</button><button class="btn red" id="stopAnimBtn">Stop</button></div>
-      <div class="grid3" style="margin-top:6px"><button class="btn ghost" id="idleOnBtn">Idle On</button><button class="btn ghost" id="idleOffBtn">Idle Off</button><button class="btn ghost" id="trophyBtn">Trophy</button></div>
-    </section>
-
-    <section>
-      <div class="title">Telemetry <span class="hint">IMU/battery/events</span></div>
-      <div class="grid4"><button class="btn ghost" id="imuBtn">IMU</button><button class="btn ghost" id="collisionBtn">Collision</button><button class="btn ghost" id="batteryBtn">Battery</button><button class="btn ghost" id="voltageBtn">Voltage</button></div>
-      <div class="grid4" style="margin-top:6px"><div class="metric">Pitch<b id="imuPitch">0°</b></div><div class="metric">Roll<b id="imuRoll">0°</b></div><div class="metric">Yaw<b id="imuYaw">0°</b></div><div class="metric">Head<b id="headOut">--</b></div></div>
-    </section>
-
-    <section>
-      <div class="title">Expert Drive <span class="hint">raw/stabilization</span></div>
-      <div class="grid2"><div><label>Stabilization</label><select id="stabSelect"><option value="1">Full control</option><option value="0">No control</option><option value="2">Pitch</option><option value="3">Roll</option><option value="4">Yaw</option><option value="5">Speed + Yaw</option></select></div><div><label>Raw motor</label><select id="rawIndex"><option value="0">Left drive</option><option value="1">Right drive</option><option value="2">Head</option><option value="3">Leg</option></select></div></div>
-      <div class="grid3" style="margin-top:5px"><select id="rawMode"><option value="0">Off</option><option value="1">Forward</option><option value="2">Reverse</option></select><input type="range" id="rawSpeed" min="0" max="255" value="80"><button class="btn amber" id="rawSendBtn">Send</button></div>
-      <div class="grid3" style="margin-top:5px"><button class="btn ghost" id="stabBtn">Set Stab</button><button class="btn red" id="rawAllOffBtn">Raw Off</button><button class="btn red" id="sleepBtn">Sleep</button></div>
-    </section>
-
-    <section class="span2">
-      <div class="title">Raw Command + Event Log <span class="hint">DID CID HEXDATA</span></div>
-      <div class="row"><input id="rawCmd" class="grow" type="text" placeholder="ex: 1A 07 06 49 00" /><button class="btn amber" id="rawCmdBtn">Send Raw</button><button class="btn ghost" id="clearLogBtn">Clear</button></div>
-      <div id="eventLog" class="log" style="margin-top:5px"></div>
-    </section>
-  </main>
-
-  <footer class="tiny">Tip: hold <span class="kbd">Shift</span> for reverse. Use STOP before picking up the droid. This page sends Sphero API v2 BLE commands directly.</footer>
+<div class="app">
+<header><div><h1>ASTROMECH LINK</h1><div class="sub">BOSS DEMO STABLE · Bluetooth-first · IMU isolated</div></div><div class="status" id="statusText">STATUS: booting...</div><div class="pill" id="batteryText">BATT: --</div><div class="row"><button class="btn" id="connectBtn">Connect</button><button class="btn red hidden" id="disconnectBtn">Disconnect</button></div></header>
+<main>
+<section class="row2"><div class="title">Drive <span class="hint">WASD/joystick</span></div><div class="drive"><div id="joystickArea" class="pad"><div id="headingArrow" class="arrow"></div><div id="joystickNub" class="nub"></div></div><div class="stack"><div class="keys"><div></div><div id="key-w" class="key">W</div><div></div><div id="key-a" class="key">A</div><div id="key-s" class="key">S</div><div id="key-d" class="key">D</div></div><div class="grid2"><button class="btn red" id="stopBtn">STOP</button><button class="btn amber" id="resetYawBtn">Reset Yaw</button></div><label>Max speed <span id="speedLabel">80</span></label><input id="speedMax" type="range" min="10" max="255" value="80"><div class="grid2"><div class="metric">Speed<b id="spdOut">0</b></div><div class="metric">Heading<b id="hdgOut">0°</b></div></div><div class="grid2"><label class="check"><input id="reverseToggle" type="checkbox"> Reverse <span class="kbd">Shift</span></label><label class="check"><input id="turboToggle" type="checkbox"> Turbo</label><label class="check"><input id="fastTurnToggle" type="checkbox"> Fast turn</label><label class="check"><input id="driftToggle" type="checkbox"> Drift</label></div></div></div></section>
+<section><div class="title">Body <span class="hint">legs/head</span></div><div class="grid4"><button class="btn ghost" onclick="setLegAction(0)">Leg Stop</button><button class="btn" onclick="setLegAction(1)">3-Leg</button><button class="btn" onclick="setLegAction(2)">2-Leg</button><button class="btn blue" onclick="setLegAction(3)">Waddle</button></div><div class="grid2" style="margin-top:6px"><div><label>Head <span id="headVal">0°</span></label><input id="headSlider" type="range" min="-180" max="180" value="0"></div><div><label>Leg pos <span id="legPosVal">0.00</span></label><input id="legPosSlider" type="range" min="0" max="1" step="0.01" value="0"></div></div><div class="grid3" style="margin-top:6px"><button class="btn ghost" id="headCenterBtn">Head 0</button><button class="btn ghost" id="getHeadBtn">Get Head</button><button class="btn ghost" id="getLegPosBtn">Get Leg</button></div></section>
+<section><div class="title">Optics <span class="hint">R2 LEDs</span></div><div class="grid2"><div><label>Front RGB</label><input type="color" id="ledFront" value="#00aaff"></div><div><label>Rear RGB</label><input type="color" id="ledRear" value="#ff0000"></div><div><label>Logic <span id="logicVal">255</span></label><input type="range" id="logicInt" min="0" max="255" value="255"></div><div><label>Holo <span id="holoVal">0</span></label><input type="range" id="holoInt" min="0" max="255" value="0"></div></div><div class="grid3" style="margin-top:6px"><button class="btn ghost" id="ledApplyBtn">Apply</button><button class="btn ghost" id="idleLedBtn">Idle LEDs</button><button class="btn red" id="ledOffBtn">Off</button></div></section>
+<section><div class="title">Audio <span class="hint">library + raw ID</span></div><div class="grid2"><select id="soundSelect"></select><input id="soundId" type="number" min="0" max="65535" value="1950" title="Any Sphero sound ID"></div><div class="grid3" style="margin-top:5px"><button class="btn pink" id="playSoundBtn">Play List</button><button class="btn pink" id="playSoundIdBtn">Play ID</button><button class="btn red" id="stopAudioBtn">Stop</button></div><div style="margin-top:5px"><label>Volume <span id="volLabel">50%</span></label><input id="masterVolume" type="range" min="0" max="255" value="128"></div></section>
+<section><div class="title">Routines <span class="hint">animations</span></div><div class="row"><select id="animSelect" class="grow"></select><button class="btn blue" id="playAnimBtn">Play</button><button class="btn red" id="stopAnimBtn">Stop</button></div><div class="grid3" style="margin-top:6px"><button class="btn ghost" id="idleOnBtn">Idle On</button><button class="btn ghost" id="idleOffBtn">Idle Off</button><button class="btn ghost" id="trophyBtn">Trophy</button></div></section>
+<section><div class="title">Telemetry <span class="hint">IMU isolated</span></div><div class="grid4"><button class="btn ghost" id="imuBtn">IMU</button><button class="btn ghost" id="batteryBtn">Battery</button><button class="btn ghost" id="voltageBtn">Voltage</button><button class="btn ghost" id="wakeBtn">Wake</button></div><div class="grid4" style="margin-top:6px"><div class="metric">Pitch<b id="imuPitch">0°</b></div><div class="metric">Roll<b id="imuRoll">0°</b></div><div class="metric">Yaw<b id="imuYaw">0°</b></div><div class="metric">Head<b id="headOut">--</b></div></div></section>
+<section><div class="title">Expert <span class="hint">raw commands</span></div><div class="row"><input id="rawCmd" class="grow" type="text" placeholder="DID CID DATA, ex: 1A 07 06 49 00"><button class="btn amber" id="rawCmdBtn">Send</button></div><div class="grid3" style="margin-top:5px"><button class="btn ghost" id="stabBtn">Stab</button><button class="btn red" id="sleepBtn">Sleep</button><button class="btn red" id="rawAllOffBtn">Raw Off</button></div></section>
+<section class="span2"><div class="title">Event Log <span class="hint">first place to check</span></div><div id="eventLog" class="log"></div></section>
+</main>
+<footer class="tiny">This file intentionally keeps Bluetooth connection code simple and unchanged by IMU. Use Chrome/Edge on HTTPS, localhost, or local file where Web Bluetooth is allowed.</footer>
 </div>
-
 <script>
 'use strict';
-
-const SPHERO_UUID_BASE = "-574f-4f20-5370-6865726f2121";
-const API_V2_SERVICE = "00010001" + SPHERO_UUID_BASE;
-const API_V2_CHARACTERISTIC = "00010002" + SPHERO_UUID_BASE;
-const API_V2_NOTIFY_CHARACTERISTIC = "00010003" + SPHERO_UUID_BASE;
-const ANTI_DOS_SERVICE = "00020001" + SPHERO_UUID_BASE;
-const ANTI_DOS_CHARACTERISTIC = "00020005" + SPHERO_UUID_BASE;
-
-let bluetoothDevice = null, controlChar = null, notifyChar = null, isConnected = false;
-let seqNum = 0, packetQueue = [], isWriting = false, pendingRequests = new Map();
-let currentSpeed = 0, currentHeading = 0, lastSpeed = -1, lastHeading = -1, isJoystickActive = false;
-let keys = {up:false, down:false, left:false, right:false};
-let imuEnabled = false, collisionEnabled = false, legNotifyEnabled = false, trophyEnabled = false;
-
-const $ = id => document.getElementById(id);
-const clamp = (v,min,max) => Math.max(min, Math.min(max, v));
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-const logEl = $('eventLog');
-function log(msg, cls='') { const d=document.createElement('div'); d.className=cls; d.textContent=`${new Date().toLocaleTimeString()} · ${msg}`; logEl.prepend(d); while(logEl.children.length>80) logEl.lastChild.remove(); }
-function status(msg, cls='warn') { $('statusText').textContent = 'STATUS: ' + msg; $('statusText').className = 'status ' + cls; }
-function setOnline(on) { document.body.classList.toggle('online', on); $('connectBtn').classList.toggle('hidden', on); $('disconnectBtn').classList.toggle('hidden', !on); }
-function bytesToHex(a){return Array.from(a).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ')}
-function toBytesU16(v){return [(v>>8)&255, v&255]}
-function float32Bytes(v){const b=new ArrayBuffer(4); new DataView(b).setFloat32(0, parseFloat(v), false); return [...new Uint8Array(b)]}
-function parseHex(s){return s.trim().split(/[\s,]+/).filter(Boolean).map(x=>parseInt(x,16)).filter(n=>Number.isFinite(n) && n>=0 && n<=255)}
-function colorBytes(hex){return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]}
-
-function escapeBytes(payload) {
-  const out=[];
-  for (const b of payload) {
-    if (b === 0x8D) out.push(0xAB, 0x05);
-    else if (b === 0xD8) out.push(0xAB, 0x50);
-    else if (b === 0xAB) out.push(0xAB, 0x23);
-    else out.push(b);
-  }
-  return out;
-}
-function unescapeBytes(frame) {
-  const out=[];
-  for (let i=1;i<frame.length-1;i++) {
-    if (frame[i] === 0xAB) { i++; if (frame[i]===0x23) out.push(0xAB); else if (frame[i]===0x05) out.push(0x8D); else if (frame[i]===0x50) out.push(0xD8); }
-    else out.push(frame[i]);
-  }
-  return out;
-}
-async function processQueue() {
-  if (isWriting || !isConnected || !controlChar || packetQueue.length === 0) return;
-  isWriting = true;
-  const packet = packetQueue.shift();
-  try { await controlChar.writeValueWithoutResponse(packet); }
-  catch (e) { log('BLE write failed: ' + e.message, 'bad'); }
-  isWriting = false;
-  if (packetQueue.length) setTimeout(processQueue, 18);
-}
-function sendCmd(did, cid, data = [], label = '') {
-  if (!isConnected || !controlChar) return null;
-  const flags = 0x0A, seq = seqNum & 255; seqNum = (seqNum + 1) & 255;
-  pendingRequests.set(seq, { did, cid, label, t: Date.now() });
-  let sum = flags + did + cid + seq; data.forEach(b => sum += b);
-  const payload = [flags, did, cid, seq, ...data, (~sum) & 255];
-  const frame = new Uint8Array([0x8D, ...escapeBytes(payload), 0xD8]);
-  packetQueue.push(frame); processQueue();
-  return seq;
-}
-function sendRaw(did, cid, data=[]){ return sendCmd(did, cid, data, 'raw'); }
-
-$('connectBtn').addEventListener('click', async () => {
-  try {
-    $('sandboxWarning').classList.remove('show');
-    if (!navigator.bluetooth) throw new Error('Web Bluetooth is unavailable in this browser/context.');
-    status('scanning...', 'warn');
-    bluetoothDevice = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [API_V2_SERVICE, ANTI_DOS_SERVICE, 'battery_service']
-    });
-    bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
-    const server = await bluetoothDevice.gatt.connect();
-    status('anti-DOS handshake...', 'warn');
-    const anti = await server.getPrimaryService(ANTI_DOS_SERVICE);
-    const antiChar = await anti.getCharacteristic(ANTI_DOS_CHARACTERISTIC);
-    await antiChar.writeValueWithResponse(new TextEncoder().encode('usetheforce...band'));
-    const api = await server.getPrimaryService(API_V2_SERVICE);
-    controlChar = await api.getCharacteristic(API_V2_CHARACTERISTIC);
-    try {
-      notifyChar = await api.getCharacteristic(API_V2_NOTIFY_CHARACTERISTIC);
-      await notifyChar.startNotifications();
-      notifyChar.addEventListener('characteristicvaluechanged', handleResponse);
-      log('API notifications enabled.');
-    } catch(e) { log('API notify characteristic unavailable: ' + e.message, 'warn'); }
-    try {
-      const bs = await server.getPrimaryService('battery_service');
-      const bc = await bs.getCharacteristic('battery_level');
-      const v = await bc.readValue(); updateBattery(v.getUint8(0) + '%');
-      await bc.startNotifications(); bc.addEventListener('characteristicvaluechanged', e => updateBattery(e.target.value.getUint8(0) + '%'));
-    } catch(e) { log('Standard battery service not found; using Sphero power commands.'); }
-    isConnected = true; setOnline(true); status('LINK ONLINE', 'good'); log('Connected to ' + (bluetoothDevice.name || 'Sphero droid'));
-    sendCmd(0x13, 0x0D, [], 'wake');
-    await sleep(280);
-    applyAllLights(); updateVolume($('masterVolume').value); requestBattery();
-  } catch (e) {
-    if (e.name === 'SecurityError' || /context|permission|bluetooth/i.test(e.message)) $('sandboxWarning').classList.add('show');
-    status('error: ' + e.message, 'bad'); log('Connect error: ' + e.message, 'bad');
-  }
-});
-$('disconnectBtn').addEventListener('click', async () => {
-  try { if (isConnected) { emergencyStop(); lightsOff(); stopAudio(); stopAnimation(); await sleep(200); sendCmd(0x13, 0x01, [], 'sleep'); await sleep(350); } if (bluetoothDevice?.gatt?.connected) await bluetoothDevice.gatt.disconnect(); }
-  catch(e){ log('Disconnect error: ' + e.message, 'bad'); }
-  finally { onDisconnected(); }
-});
-function onDisconnected(){ isConnected=false; controlChar=null; notifyChar=null; packetQueue=[]; pendingRequests.clear(); setOnline(false); status('OFFLINE', 'bad'); updateBattery('--'); imuEnabled=false; collisionEnabled=false; log('Disconnected.'); }
-
-function handleResponse(e) {
-  try {
-    const raw = new Uint8Array(e.target.value.buffer);
-    if (raw.length < 3 || raw[0] !== 0x8D) return;
-    const p = unescapeBytes(raw); if (!p.length) return;
-    const flags = p[0]; let ptr = 1;
-    const isResponse = (flags & 0x01) !== 0;
-    if ((flags & 0x08) !== 0) ptr++; // target
-    if ((flags & 0x10) !== 0) ptr++; // source
-    if (isResponse) {
-      const seq = p[ptr++], err = p[ptr++], data = p.slice(ptr, -1);
-      const req = pendingRequests.get(seq); pendingRequests.delete(seq);
-      if (err !== 0) { log(`ERR seq ${seq}: 0x${err.toString(16)} ${req?.label||''}`, 'bad'); return; }
-      if (req) parseResponse(req, data);
-    } else {
-      const did = p[ptr++], cid = p[ptr++], seq = p[ptr++], data = p.slice(ptr, -1);
-      parseAsync(did, cid, data);
-    }
-  } catch(err) { log('Response parse error: ' + err.message, 'bad'); }
-}
-function parseResponse(req, data) {
-  const view = new DataView(new Uint8Array(data).buffer);
-  if (req.did===0x13 && req.cid===0x04 && data.length) updateBattery(['CHARGED','CHARGING','NOT CHARGING','OK','LOW','CRITICAL','RESERVED','UNUSED'][data[0]] || 'UNKNOWN');
-  else if (req.did===0x13 && req.cid===0x03 && data.length>=2) { const mv=(data[0]<<8|data[1]); updateBattery((mv/100).toFixed(2)+'V'); log('Battery voltage: '+(mv/100).toFixed(2)+' V'); }
-  else if (req.did===0x13 && req.cid===0x10 && data.length) { updateBattery(data[0]+'%'); log('Battery percent: '+data[0]+'%'); }
-  else if (req.did===0x17 && req.cid===0x14 && data.length>=4) { const v=view.getFloat32(0,false); $('headOut').textContent=v.toFixed(1)+'°'; $('headVal').textContent=Math.round(v)+'°'; $('headSlider').value=clamp(v,-180,180); }
-  else if (req.did===0x17 && req.cid===0x16 && data.length>=4) { const v=view.getFloat32(0,false); $('legPosVal').textContent=v.toFixed(2); $('legPosSlider').value=clamp(v,0,1); }
-  else if (req.did===0x18 && req.cid===0x01 && data.length>=7) { log(`Sensor mask: interval=${(data[0]<<8)|data[1]}ms count=${data[2]} mask=0x${((data[3]<<24)|(data[4]<<16)|(data[5]<<8)|data[6]).toString(16).padStart(8,'0')}`); }
-  else if (req.label) log(`OK ${req.label}: ${bytesToHex(data)}`);
-}
-function parseFloat32List(data) {
-  const dv = new DataView(new Uint8Array(data).buffer);
-  const out = [];
-  for (let i = 0; i + 3 < data.length; i += 4) out.push(dv.getFloat32(i, false));
-  return out;
-}
-function parseAsync(did, cid, data) {
-  if (did===0x18 && cid===0x02) {
-    // R2-D2/BB-9E v2 sensor streaming emits big-endian float32 values.
-    // The old Sphero v1 stream used int16 attitude values, so keep a fallback for odd firmware/packet variants.
-    if (data.length >= 12 && data.length % 4 === 0) {
-      const vals = parseFloat32List(data);
-      const pitch = vals[0] ?? 0, roll = vals[1] ?? 0, yaw = vals[2] ?? 0;
-      $('imuPitch').textContent = pitch.toFixed(1) + '°';
-      $('imuRoll').textContent = roll.toFixed(1) + '°';
-      $('imuYaw').textContent = yaw.toFixed(1) + '°';
-      if (Math.random() < 0.04) log(`IMU float frame: ${vals.slice(0,3).map(v=>v.toFixed(2)).join(', ')}`);
-    } else if (data.length >= 6) {
-      const dv = new DataView(new Uint8Array(data).buffer);
-      const pitch = dv.getInt16(0,false), roll = dv.getInt16(2,false), yaw = dv.getInt16(4,false);
-      $('imuPitch').textContent = pitch + '°'; $('imuRoll').textContent = roll + '°'; $('imuYaw').textContent = yaw + '°';
-      log('IMU int16 fallback frame: ' + bytesToHex(data));
-    } else {
-      log('IMU frame too short: ' + bytesToHex(data), 'warn');
-    }
-  } else if (did===0x18 && cid===0x12) log('Collision: ' + bytesToHex(data), 'warn');
-  else if (did===0x17 && cid===0x26) log('Leg action complete.', 'good');
-  else if (did===0x17 && cid===0x3A) log('Head reset-to-zero event.', 'good');
-  else log(`Async DID ${did.toString(16)} CID ${cid.toString(16)}: ${bytesToHex(data)}`);
-}
-function updateBattery(t){ const el=$('batteryText'); el.textContent='BATT: '+t; el.className='pill ' + (/LOW|CRIT/i.test(t)?'bad':/%|OK|CHARG|V/i.test(t)?'good':''); }
-
-function driveFlags(){ return ($('reverseToggle').checked?1:0) | ($('turboToggle').checked?2:0) | ($('fastTurnToggle').checked?4:0) | ($('driftToggle').checked?32:0); }
-function sendDrive(speed=currentSpeed, heading=Math.round(currentHeading)) { currentSpeed=clamp(Math.round(speed),0,255); currentHeading=((Math.round(heading)%360)+360)%360; $('spdOut').textContent=currentSpeed; $('hdgOut').textContent=currentHeading+'°'; $('headingArrow').style.transform=`rotate(${currentHeading}deg)`; $('headingArrow').style.opacity=currentSpeed>0?1:.35; sendCmd(0x16,0x07,[currentSpeed,...toBytesU16(currentHeading),driveFlags()],'drive'); }
-function emergencyStop(){ currentSpeed=0; sendDrive(0,currentHeading); log('Emergency stop.','warn'); }
-$('stopBtn').onclick=emergencyStop;
-$('resetYawBtn').onclick=()=>sendCmd(0x16,0x06,[],'reset yaw');
-$('speedMax').oninput=e=>{$('speedLabel').textContent=e.target.value; updateKeyboard();};
-['reverseToggle','turboToggle','fastTurnToggle','driftToggle'].forEach(id=>$(id).onchange=()=>{document.body.classList.toggle('reverse',$('reverseToggle').checked); if(currentSpeed>0) sendDrive(currentSpeed,currentHeading);});
-
-function updateKeyboard(){ if (isJoystickActive) return; let x=0,y=0; if(keys.up)y-=1;if(keys.down)y+=1;if(keys.left)x-=1;if(keys.right)x+=1; const max=+$('speedMax').value; let speed=(x||y)?max:0; let hdg=currentHeading; if(speed){ hdg = Math.atan2(y,x)*180/Math.PI + 90; if(hdg<0) hdg+=360; } if (speed!==lastSpeed || Math.abs(hdg-lastHeading)>1){lastSpeed=speed;lastHeading=hdg;sendDrive(speed,hdg);} }
-const area=$('joystickArea'), nub=$('joystickNub');
-function handleMove(e){ if(!isJoystickActive) return; e.preventDefault(); const r=area.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2; const pt=e.touches?e.touches[0]:e; const dx=pt.clientX-cx, dy=pt.clientY-cy, rad=r.width/2; let dist=Math.hypot(dx,dy), angle=Math.atan2(dy,dx); const limited=Math.min(dist,rad-6); nub.style.transform=`translate(${Math.cos(angle)*limited}px,${Math.sin(angle)*limited}px)`; const dz=rad*.25; let speed=dist<dz?0:Math.round(Math.pow(Math.min(1,(dist-dz)/(rad-dz)),2.4)*+$('speedMax').value); let hdg=angle*180/Math.PI+90; if(hdg<0)hdg+=360; if(Math.abs(speed-lastSpeed)>3 || Math.abs(hdg-lastHeading)>5){lastSpeed=speed;lastHeading=hdg;sendDrive(speed,hdg);} }
-function endJoy(){ if(!isJoystickActive)return; isJoystickActive=false;nub.style.transform='translate(0,0)';sendDrive(0,currentHeading); }
-area.addEventListener('mousedown',e=>{isJoystickActive=true;handleMove(e)}); window.addEventListener('mousemove',handleMove); window.addEventListener('mouseup',endJoy);
-area.addEventListener('touchstart',e=>{isJoystickActive=true;handleMove(e)},{passive:false}); window.addEventListener('touchmove',handleMove,{passive:false}); window.addEventListener('touchend',endJoy);
-window.addEventListener('keydown', e => { if(e.repeat||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return; if(e.key==='Shift'){$('reverseToggle').checked=true;$('reverseToggle').dispatchEvent(new Event('change'));} if(['w','ArrowUp'].includes(e.key)){keys.up=true;$('key-w').classList.add('active')} if(['a','ArrowLeft'].includes(e.key)){keys.left=true;$('key-a').classList.add('active')} if(['s','ArrowDown'].includes(e.key)){keys.down=true;$('key-s').classList.add('active')} if(['d','ArrowRight'].includes(e.key)){keys.right=true;$('key-d').classList.add('active')} if(e.code==='Space'){e.preventDefault(); emergencyStop();} updateKeyboard(); });
-window.addEventListener('keyup', e => { if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return; if(e.key==='Shift'){$('reverseToggle').checked=false;$('reverseToggle').dispatchEvent(new Event('change'));} if(['w','ArrowUp'].includes(e.key)){keys.up=false;$('key-w').classList.remove('active')} if(['a','ArrowLeft'].includes(e.key)){keys.left=false;$('key-a').classList.remove('active')} if(['s','ArrowDown'].includes(e.key)){keys.down=false;$('key-s').classList.remove('active')} if(['d','ArrowRight'].includes(e.key)){keys.right=false;$('key-d').classList.remove('active')} updateKeyboard(); });
-
-function setLegAction(n){ sendCmd(0x17,0x0D,[n],['leg stop','three-leg','two-leg','waddle'][n]||'leg'); }
-$('headSlider').oninput=e=>{ $('headVal').textContent=e.target.value+'°'; sendCmd(0x17,0x0F,float32Bytes(e.target.value),'set head'); };
-$('headCenterBtn').onclick=()=>{ $('headSlider').value=0; $('headSlider').dispatchEvent(new Event('input')); };
-$('getHeadBtn').onclick=()=>sendCmd(0x17,0x14,[],'get head');
-$('legPosSlider').oninput=e=>{ $('legPosVal').textContent=(+e.target.value).toFixed(2); sendCmd(0x17,0x15,float32Bytes(e.target.value),'set leg position'); };
-$('getLegPosBtn').onclick=()=>sendCmd(0x17,0x16,[],'get leg position');
-$('legNotifyBtn').onclick=()=>{ legNotifyEnabled=!legNotifyEnabled; sendCmd(0x17,0x2A,[legNotifyEnabled?1:0],'leg notify '+legNotifyEnabled); };
-
-let ledTimer=null; function scheduleLights(){ clearTimeout(ledTimer); ledTimer=setTimeout(applyAllLights,45); }
-function applyAllLights(){ const f=colorBytes($('ledFront').value), r=colorBytes($('ledRear').value), li=+$('logicInt').value, hi=+$('holoInt').value; sendCmd(0x1A,0x0E,[0x00,0x07,...f],'front LEDs'); sendCmd(0x1A,0x0E,[0x00,0x70,...r],'rear LEDs'); sendCmd(0x1A,0x0E,[0x00,0x08,li],'logic brightness'); sendCmd(0x1A,0x0E,[0x00,0x80,hi],'holo brightness'); }
-function lightsOff(){ sendCmd(0x1A,0x0E,[0x00,0x07,0,0,0],'front off'); sendCmd(0x1A,0x0E,[0x00,0x70,0,0,0],'rear off'); sendCmd(0x1A,0x0E,[0x00,0x08,0],'logic off'); sendCmd(0x1A,0x0E,[0x00,0x80,0],'holo off'); }
-['ledFront','ledRear','logicInt','holoInt'].forEach(id=>$(id).oninput=e=>{ if(id==='logicInt')$('logicVal').textContent=e.target.value; if(id==='holoInt')$('holoVal').textContent=e.target.value; scheduleLights(); });
-$('ledApplyBtn').onclick=applyAllLights; $('ledOffBtn').onclick=lightsOff; $('idleLedBtn').onclick=()=>sendCmd(0x1A,0x19,[],'idle LED animation');
-
-function updateVolume(v){ v=+v; $('volLabel').textContent=Math.round(v/255*100)+'%'; sendCmd(0x1A,0x08,[v],'volume'); }
-function playSound(id){ const mode=+$('playbackMode').value; sendCmd(0x1A,0x07,[...toBytesU16(id),mode],'sound '+id); }
-function stopAudio(){ sendCmd(0x1A,0x0A,[],'stop audio'); }
-$('masterVolume').oninput=e=>updateVolume(e.target.value); $('playSoundBtn').onclick=()=>{const id=+$('soundSelect').value;if(id)playSound(id)}; $('stopAudioBtn').onclick=stopAudio;
-
-function playAnimation(id){ sendCmd(0x17,0x05,toBytesU16(id),'animation '+id); }
-function stopAnimation(){ sendCmd(0x17,0x2B,[],'stop animation'); }
-$('playAnimBtn').onclick=()=>playAnimation(+$('animSelect').value); $('stopAnimBtn').onclick=stopAnimation;
-$('idleOnBtn').onclick=()=>sendCmd(0x17,0x2C,[1],'idle animations on'); $('idleOffBtn').onclick=()=>sendCmd(0x17,0x2C,[0],'idle animations off');
-$('trophyBtn').onclick=()=>{ trophyEnabled=!trophyEnabled; sendCmd(0x17,0x2D,[trophyEnabled?1:0],'trophy '+trophyEnabled); };
-
-function requestBattery(){ sendCmd(0x13,0x04,[],'battery state'); sendCmd(0x13,0x10,[],'battery percent'); }
-$('batteryBtn').onclick=requestBattery;
-$('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');
-
-$('imuBtn').onclick=()=>{
-  imuEnabled=!imuEnabled;
-  if(imuEnabled) {
-    // Keep the original working BLE connection flow unchanged.
-    // Sensor DID 0x18 / CID 0x00 payload: interval u16, count u8, mask u32.
-    // 0x00070000 = attitude pitch/roll/yaw.
-    sendCmd(0x18,0x00,[0x00,0xFA,0x00,0x00,0x07,0x00,0x00],'IMU attitude stream on');
-    log('IMU stream requested: attitude pitch/roll/yaw every 250ms.');
-  } else {
-    sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'IMU off');
-    $('imuPitch').textContent='0°';
-    $('imuRoll').textContent='0°';
-    $('imuYaw').textContent='0°';
-    log('IMU stream stopped.');
-  }
-};
-
-$('collisionBtn').onclick=()=>{ collisionEnabled=!collisionEnabled; if(collisionEnabled){ sendCmd(0x18,0x11,[1,80,80,40,40,80],'configure collision'); sendCmd(0x18,0x14,[1],'collision on'); } else sendCmd(0x18,0x14,[0],'collision off'); };
-$('stabBtn').onclick=()=>sendCmd(0x16,0x0C,[+$('stabSelect').value],'stabilization');
-$('rawSendBtn').onclick=()=>sendCmd(0x16,0x0B,[+$('rawIndex').value,+$('rawMode').value,0,+$('rawSpeed').value],'raw motor');
-$('rawAllOffBtn').onclick=()=>{ for(let i=0;i<4;i++) sendCmd(0x16,0x0B,[i,0,0,0],'raw off'); };
-$('sleepBtn').onclick=()=>sendCmd(0x13,0x01,[],'sleep');
-$('rawCmdBtn').onclick=()=>{ const a=parseHex($('rawCmd').value); if(a.length<2){log('Raw command needs DID CID [DATA...]','bad');return;} sendCmd(a[0],a[1],a.slice(2),'raw user'); };
-$('clearLogBtn').onclick=()=
-
-const ANIMS = `
-CHARGER_1,0
-CHARGER_2,1
-CHARGER_3,2
-CHARGER_4,3
-CHARGER_5,4
-CHARGER_6,5
-CHARGER_7,6
-EMOTE_ALARM,7
-EMOTE_ANGRY,8
-EMOTE_ATTENTION,9
-EMOTE_FRUSTRATED,10
-EMOTE_DRIVE,11
-EMOTE_EXCITED,12
-EMOTE_SEARCH,13
-EMOTE_SHORT_CIRCUIT,14
-EMOTE_LAUGH,15
-EMOTE_NO,16
-EMOTE_RETREAT,17
-EMOTE_FIERY,18
-EMOTE_UNDERSTOOD,19
-EMOTE_YES,21
-EMOTE_SCAN,22
-EMOTE_SURPRISED,24
-IDLE_1,25
-IDLE_2,26
-IDLE_3,27
-WWM_ANGRY,31
-WWM_ANXIOUS,32
-WWM_BOW,33
-WWM_CONCERN,34
-WWM_CURIOUS,35
-WWM_DOUBLE_TAKE,36
-WWM_EXCITED,37
-WWM_FIERY,38
-WWM_FRUSTRATED,39
-WWM_HAPPY,40
-WWM_JITTERY,41
-WWM_LAUGH,42
-WWM_LONG_SHAKE,43
-WWM_NO,44
-WWM_OMINOUS,45
-WWM_RELIEVED,46
-WWM_SAD,47
-WWM_SCARED,48
-WWM_SHAKE,49
-WWM_SURPRISED,50
-WWM_TAUNTING,51
-WWM_WHISPER,52
-WWM_YELLING,53
-WWM_YOOHOO,54
-MOTOR,55`;
-
-const SOUND_CSV = `
-TEST_1497HZ,1
-TEST_200HZ,32
-TEST_2517HZ,63
-TEST_3581HZ,94
-TEST_431HZ,125
-TEST_6011HZ,156
-TEST_853HZ,187
-BB8_ALARM_1,218
-BB8_ALARM_10,235
-BB8_ALARM_11,254
-BB8_ALARM_12,258
-BB8_ALARM_2,264
-BB8_ALARM_3,268
-BB8_ALARM_4,272
-BB8_ALARM_6,279
-BB8_ALARM_7,288
-BB8_ALARM_8,296
-BB8_ALARM_9,301
-BB8_BOOT_UP,309
-BB8_BOOR_UP_2,330
-BB8_CHATTY_1,352
-BB8_CHATTY_10,356
-BB8_CHATTY_11,360
-BB8_CHATTY_12,368
-BB8_CHATTY_13,375
-BB8_CHATTY_14,381
-BB8_CHATTY_15,390
-BB8_CHATTY_16,397
-BB8_CHATTY_17,404
-BB8_CHATTY_18,410
-BB8_CHATTY_19,417
-BB8_CHATTY_2,430
-BB8_CHATTY_20,464
-BB8_CHATTY_22,471
-BB8_CHATTY_23,479
-BB8_CHATTY_24,492
-BB8_CHATTY_25,518
-BB8_CHATTY_26,525
-BB8_CHATTY_27,537
-BB8_CHATTY_3,544
-BB8_CHATTY_4,557
-BB8_CHATTY_5,570
-BB8_CHATTY_6,577
-BB8_CHATTY_7,581
-BB8_CHATTY_8,587
-BB8_CHATTY_9,599
-BB8_DONT_KNOW,606
-BB8_EXCITED_1,612
-BB8_EXCITED_2,622
-BB8_EXCITED_3,630
-BB8_EXCITED_4,644
-BB8_HEY_1,671
-BB8_HEY_10,682
-BB8_HEY_11,686
-BB8_HEY_12,690
-BB8_HEY_13,700
-BB8_HEY_2,724
-BB8_HEY_3,732
-BB8_HEY_4,734
-BB8_HEY_5,739
-BB8_HEY_6,743
-BB8_HEY_7,747
-BB8_HEY_8,753
-BB8_HEY_9,757
-BB8_LAUGH_1,761
-BB8_LAUGH_2,764
-BB8_NEGATIVE_1,787
-BB8_NEGATIVE_10,792
-BB8_NEGATIVE_11,802
-BB8_NEGATIVE_12,813
-BB8_NEGATIVE_13,825
-BB8_NEGATIVE_14,831
-BB8_NEGATIVE_15,836
-BB8_NEGATIVE_16,859
-BB8_NEGATIVE_17,867
-BB8_NEGATIVE_18,874
-BB8_NEGATIVE_19,888
-BB8_NEGATIVE_2,896
-BB8_NEGATIVE_20,902
-BB8_NEGATIVE_21,916
-BB8_NEGATIVE_22,927
-BB8_NEGATIVE_23,935
-BB8_NEGATIVE_24,946
-BB8_NEGATIVE_25,953
-BB8_NEGATIVE_26,963
-BB8_NEGATIVE_27,969
-BB8_NEGATIVE_28,983
-BB8_NEGATIVE_29,988
-BB8_NEGATIVE_3,998
-BB8_NEGATIVE_30,1003
-BB8_NEGATIVE_4,1010
-BB8_NEGATIVE_5,1020
-BB8_NEGATIVE_6,1032
-BB8_NEGATIVE_7,1040
-BB8_NEGATIVE_8,1052
-BB8_NEGATIVE_9,1064
-BB8_POSITIVE_1,1077
-BB8_POSITIVE_10,1082
-BB8_POSITIVE_11,1087
-BB8_POSITIVE_12,1092
-BB8_POSITIVE_13,1096
-BB8_POSITIVE_14,1102
-BB8_POSITIVE_15,1109
-BB8_POSITIVE_16,1113
-BB8_POSITIVE_2,1118
-BB8_POSITIVE_3,1123
-BB8_POSITIVE_4,1130
-BB8_POSITIVE_5,1135
-BB8_POSITIVE_6,1138
-BB8_POSITIVE_7,1147
-BB8_POSITIVE_8,1150
-BB8_POSITIVE_9,1157
-BB8_SAD_1,1163
-BB8_SAD_10,1170
-BB8_SAD_11,1178
-BB8_SAD_12,1186
-BB8_SAD_13,1192
-BB8_SAD_14,1199
-BB8_SAD_15,1205
-BB8_SAD_16,1213
-BB8_SAD_17,1220
-BB8_SAD_18,1230
-BB8_SAD_2,1236
-BB8_SAD_3,1240
-BB8_SAD_4,1250
-BB8_SAD_5,1268
-BB8_SAD_6,1275
-BB8_SAD_7,1281
-BB8_SAD_8,1295
-BB8_SAD_9,1303
-BB8_SHORTCUT,1308
-BB8_WOW_1,1324
-BB9E_ALARM_1,1329
-BB9E_ALARM_2,1347
-BB9E_ALARM_3,1363
-BB9E_ALARM_4,1375
-BB9E_ALARM_5,1384
-BB9E_CHATTY_1,1394
-BB9E_CHATTY_2,1408
-BB9E_EXCITED_1,1432
-BB9E_EXCITED_2,1442
-BB9E_EXCITED_3,1463
-BB9E_HEY_1,1476
-BB9E_HEY_2,1486
-BB9E_NEGATIVE_1,1494
-BB9E_NEGATIVE_2,1505
-BB9E_NEGATIVE_3,1516
-BB9E_NEGATIVE_4,1523
-BB9E_POSITIVE_1,1531
-BB9E_POSITIVE_2,1549
-BB9E_POSITIVE_3,1558
-BB9E_POSITIVE_4,1571
-BB9E_POSITIVE_5,1583
-BB9E_SAD_1,1592
-BB9E_SAD_2,1600
-R2_FALL,1609
-R2_HIT_1,1623
-R2_HIT_10,1628
-R2_HIT_11,1635
-R2_HIT_2,1642
-R2_HIT_3,1647
-R2_HIT_4,1653
-R2_HIT_5,1659
-R2_HIT_6,1664
-R2_HIT_7,1669
-R2_HIT_8,1676
-R2_HIT_9,1684
-R2_STEP_1,1690
-R2_STEP_2,1693
-R2_STEP_3,1696
-R2_STEP_4,1698
-R2_STEP_5,1700
-R2_STEP_6,1702
-R2_ACCESS_PANELS,1704
-R2_ALARM_1,1737
-R2_ALARM_10,1747
-R2_ALARM_12,1756
-R2_ALARM_13,1763
-R2_ALARM_14,1771
-R2_ALARM_15,1784
-R2_ALARM_16,1791
-R2_ALARM_2,1809
-R2_ALARM_3,1821
-R2_ALARM_4,1831
-R2_ALARM_5,1835
-R2_ALARM_6,1843
-R2_ALARM_7,1858
-R2_ALARM_8,1867
-R2_ALARM_9,1893
-R2_ANNOYED,1910
-R2_BURNOUT,1915
-R2_CHATTY_1,1950
-R2_CHATTY_10,1959
-R2_CHATTY_11,1966
-R2_CHATTY_12,1977
-R2_CHATTY_13,1987
-R2_CHATTY_14,2002
-R2_CHATTY_15,2007
-R2_CHATTY_16,2010
-R2_CHATTY_17,2019
-R2_CHATTY_18,2028
-R2_CHATTY_19,2039
-R2_CHATTY_2,2061
-R2_CHATTY_20,2072
-R2_CHATTY_21,2080
-R2_CHATTY_22,2085
-R2_CHATTY_23,2095
-R2_CHATTY_24,2105
-R2_CHATTY_25,2121
-R2_CHATTY_26,2132
-R2_CHATTY_27,2143
-R2_CHATTY_28,2157
-R2_CHATTY_29,2170
-R2_CHATTY_3,2174
-R2_CHATTY_30,2184
-R2_CHATTY_31,2188
-R2_CHATTY_32,2198
-R2_CHATTY_33,2202
-R2_CHATTY_34,2211
-R2_CHATTY_35,2221
-R2_CHATTY_36,2232
-R2_CHATTY_37,2241
-R2_CHATTY_38,2253
-R2_CHATTY_39,2264
-R2_CHATTY_4,2276
-R2_CHATTY_40,2285
-R2_CHATTY_41,2292
-R2_CHATTY_42,2307
-R2_CHATTY_43,2322
-R2_CHATTY_44,2332
-R2_CHATTY_45,2344
-R2_CHATTY_46,2357
-R2_CHATTY_47,2368
-R2_CHATTY_48,2377
-R2_CHATTY_49,2387
-R2_CHATTY_5,2399
-R2_CHATTY_50,2413
-R2_CHATTY_51,2424
-R2_CHATTY_52,2439
-R2_CHATTY_53,2452
-R2_CHATTY_54,2457
-R2_CHATTY_55,2463
-R2_CHATTY_56,2474
-R2_CHATTY_57,2492
-R2_CHATTY_58,2509
-R2_CHATTY_59,2519
-R2_CHATTY_6,2524
-R2_CHATTY_60,2535
-R2_CHATTY_61,2543
-R2_CHATTY_62,2554
-R2_CHATTY_7,2562
-R2_CHATTY_8,2572
-R2_CHATTY_9,2579
-R2_ENGAGE_HYPER_DRIVE,2586
-R2_EXCITED_1,2600
-R2_EXCITED_10,2615
-R2_EXCITED_11,2633
-R2_EXCITED_12,2644
-R2_EXCITED_13,2654
-R2_EXCITED_14,2662
-R2_EXCITED_15,2680
-R2_EXCITED_16,2691
-R2_EXCITED_2,2708
-R2_EXCITED_3,2726
-R2_EXCITED_4,2730
-R2_EXCITED_5,2736
-R2_EXCITED_6,2753
-R2_EXCITED_7,2767
-R2_EXCITED_8,2777
-R2_EXCITED_9,2787
-R2_HEAD_SPIN,2797
-R2_HEY_1,2813
-R2_HEY_10,2824
-R2_HEY_11,2828
-R2_HEY_12,2833
-R2_HEY_2,2841
-R2_HEY_3,2856
-R2_HEY_4,2861
-R2_HEY_5,2882
-R2_HEY_6,2893
-R2_HEY_7,2898
-R2_HEY_8,2904
-R2_HEY_9,2912
-R2_LAUGH_1,2919
-R2_LAUGH_2,2935
-R2_LAUGH_3,2950
-R2_LAUGH_4,2955
-R2_MOTOR,2970
-R2_NEGATIVE_1,3101
-R2_NEGATIVE_10,3111
-R2_NEGATIVE_11,3115
-R2_NEGATIVE_12,3121
-R2_NEGATIVE_13,3132
-R2_NEGATIVE_14,3136
-R2_NEGATIVE_15,3148
-R2_NEGATIVE_16,3152
-R2_NEGATIVE_17,3157
-R2_NEGATIVE_18,3164
-R2_NEGATIVE_19,3167
-R2_NEGATIVE_2,3172
-R2_NEGATIVE_20,3178
-R2_NEGATIVE_21,3191
-R2_NEGATIVE_22,3200
-R2_NEGATIVE_23,3213
-R2_NEGATIVE_24,3219
-R2_NEGATIVE_25,3226
-R2_NEGATIVE_26,3230
-R2_NEGATIVE_27,3233
-R2_NEGATIVE_28,3241
-R2_NEGATIVE_3,3251
-R2_NEGATIVE_4,3258
-R2_NEGATIVE_5,3263
-R2_NEGATIVE_6,3268
-R2_NEGATIVE_7
+const SPHERO_UUID_BASE='-574f-4f20-5370-6865726f2121';
+const API_V2_SERVICE='00010001'+SPHERO_UUID_BASE;
+const API_V2_CHARACTERISTIC='00010002'+SPHERO_UUID_BASE;
+const API_V2_NOTIFY_CHARACTERISTIC='00010003'+SPHERO_UUID_BASE;
+const ANTI_DOS_SERVICE='00020001'+SPHERO_UUID_BASE;
+const ANTI_DOS_CHARACTERISTIC='00020005'+SPHERO_UUID_BASE;
+let bluetoothDevice=null,controlChar=null,notifyChar=null,isConnected=false,seqNum=0;
+let packetQueue=[],isWriting=false,pendingRequests=new Map();
+let currentSpeed=0,currentHeading=0,lastSpeed=-1,lastHeading=-1,isJoystickActive=false;
+let keys={up:false,down:false,left:false,right:false},imuEnabled=false,trophyEnabled=false;
+const $=id=>document.getElementById(id);
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function log(msg,cls=''){const d=document.createElement('div');d.className=cls;d.textContent=new Date().toLocaleTimeString()+' · '+msg;$('eventLog').prepend(d);while($('eventLog').children.length>90)$('eventLog').lastChild.remove();}
+function status(msg,cls='warn'){$('statusText').textContent='STATUS: '+msg;$('statusText').className='status '+cls;}
+function setOnline(on){document.body.classList.toggle('online',on);$('connectBtn').classList.toggle('hidden',on);$('disconnectBtn').classList.toggle('hidden',!on);}
+function bytesToHex(a){return Array.from(a).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ');}
+function toBytesU16(v){v=Number(v)||0;return[(v>>8)&255,v&255];}
+function float32Bytes(v){const b=new ArrayBuffer(4);new DataView(b).setFloat32(0,parseFloat(v)||0,false);return[...new Uint8Array(b)];}
+function colorBytes(hex){return[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];}
+function parseHex(s){return s.trim().split(/[\s,]+/).filter(Boolean).map(x=>parseInt(x,16)).filter(n=>Number.isFinite(n)&&n>=0&&n<=255);}
+function escapeBytes(payload){const out=[];for(const b of payload){if(b===0x8D)out.push(0xAB,0x05);else if(b===0xD8)out.push(0xAB,0x50);else if(b===0xAB)out.push(0xAB,0x23);else out.push(b);}return out;}
+function unescapeBytes(frame){const out=[];for(let i=1;i<frame.length-1;i++){if(frame[i]===0xAB){i++;if(frame[i]===0x23)out.push(0xAB);else if(frame[i]===0x05)out.push(0x8D);else if(frame[i]===0x50)out.push(0xD8);}else out.push(frame[i]);}return out;}
+async function processQueue(){if(isWriting||!controlChar||!isConnected||packetQueue.length===0)return;isWriting=true;const packet=packetQueue.shift();try{await controlChar.writeValueWithoutResponse(packet);}catch(e){log('BLE write failed: '+e.message,'bad');}isWriting=false;if(packetQueue.length)setTimeout(processQueue,18);}
+function sendCmd(did,cid,data=[],label=''){if(!isConnected||!controlChar){log('Not connected: '+(label||('DID '+did)),'warn');return null;}const flags=0x0A,seq=seqNum&255;seqNum=(seqNum+1)&255;pendingRequests.set(seq,{did,cid,label,t:Date.now()});let sum=flags+did+cid+seq;data.forEach(b=>sum+=b);const payload=[flags,did,cid,seq,...data,(~sum)&255];packetQueue.push(new Uint8Array([0x8D,...escapeBytes(payload),0xD8]));processQueue();return seq;}
+$('connectBtn').addEventListener('click',async()=>{try{if(!navigator.bluetooth)throw new Error('Web Bluetooth is unavailable in this browser/context.');status('scanning...','warn');bluetoothDevice=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[API_V2_SERVICE,ANTI_DOS_SERVICE,'battery_service']});bluetoothDevice.addEventListener('gattserverdisconnected',onDisconnected);const server=await bluetoothDevice.gatt.connect();status('anti-DOS handshake...','warn');const anti=await server.getPrimaryService(ANTI_DOS_SERVICE);const antiChar=await anti.getCharacteristic(ANTI_DOS_CHARACTERISTIC);await antiChar.writeValueWithResponse(new TextEncoder().encode('usetheforce...band'));const api=await server.getPrimaryService(API_V2_SERVICE);controlChar=await api.getCharacteristic(API_V2_CHARACTERISTIC);try{notifyChar=await api.getCharacteristic(API_V2_NOTIFY_CHARACTERISTIC);await notifyChar.startNotifications();notifyChar.addEventListener('characteristicvaluechanged',handleResponse);log('API notifications enabled.');}catch(e){log('API notifications unavailable: '+e.message,'warn');}try{const bs=await server.getPrimaryService('battery_service');const bc=await bs.getCharacteristic('battery_level');const v=await bc.readValue();updateBattery(v.getUint8(0)+'%');await bc.startNotifications();bc.addEventListener('characteristicvaluechanged',e=>updateBattery(e.target.value.getUint8(0)+'%'));}catch(e){log('Standard BLE battery unavailable; using Sphero power API.');}isConnected=true;setOnline(true);status('LINK ONLINE','good');log('Connected to '+(bluetoothDevice.name||'Sphero droid'),'good');sendCmd(0x13,0x0D,[],'wake');await sleep(300);applyAllLights();updateVolume($('masterVolume').value);requestBattery();}catch(e){status('error: '+e.message,'bad');log('Connect error: '+e.message,'bad');}});
+$('disconnectBtn').onclick=async()=>{try{if(isConnected){emergencyStop();lightsOff();stopAudio();stopAnimation();await sleep(200);sendCmd(0x13,0x01,[0,0,0,0,0],'sleep');await sleep(350);}if(bluetoothDevice?.gatt?.connected)await bluetoothDevice.gatt.disconnect();}catch(e){log('Disconnect error: '+e.message,'bad');}finally{onDisconnected();}};
+function onDisconnected(){isConnected=false;controlChar=null;notifyChar=null;packetQueue=[];pendingRequests.clear();setOnline(false);status('OFFLINE','bad');updateBattery('--');imuEnabled=false;log('Disconnected.');}
+function handleResponse(e){try{const raw=new Uint8Array(e.target.value.buffer);if(raw.length<3||raw[0]!==0x8D)return;const p=unescapeBytes(raw);if(!p.length)return;const flags=p[0];let ptr=1;const isResponse=(flags&0x01)!==0;if((flags&0x08)!==0)ptr++;if((flags&0x10)!==0)ptr++;if(isResponse){const seq=p[ptr++],err=p[ptr++],data=p.slice(ptr,-1),req=pendingRequests.get(seq);pendingRequests.delete(seq);if(err!==0){log('ERR seq '+seq+' err 0x'+err.toString(16)+' '+(req?.label||''),'bad');return;}if(req)parseResponse(req,data);}else{const did=p[ptr++],cid=p[ptr++];ptr++;parseAsync(did,cid,p.slice(ptr,-1));}}catch(err){log('Response parse error: '+err.message,'bad');}}
+function parseResponse(req,data){const view=new DataView(new Uint8Array(data).buffer);if(req.did===0x13&&req.cid===0x04&&data.length)updateBattery(['CHARGED','CHARGING','NOT CHARGING','OK','LOW','CRITICAL','RESERVED','UNUSED'][data[0]]||'UNKNOWN');else if(req.did===0x13&&req.cid===0x03&&data.length>=2){const mv=(data[0]<<8|data[1]);updateBattery((mv/100).toFixed(2)+'V');}else if(req.did===0x13&&req.cid===0x10&&data.length)updateBattery(data[0]+'%');else if(req.did===0x17&&req.cid===0x14&&data.length>=4){const v=view.getFloat32(0,false);$('headOut').textContent=v.toFixed(1)+'°';}else if(req.did===0x17&&req.cid===0x16&&data.length>=4){const v=view.getFloat32(0,false);$('legPosVal').textContent=v.toFixed(2);$('legPosSlider').value=clamp(v,0,1);}else if(req.label)log('OK '+req.label+(data.length?': '+bytesToHex(data):''));}
+function parseFloat32List(data){const dv=new DataView(new Uint8Array(data).buffer);const out=[];for(let i=0;i+3<data.length;i+=4)out.push(dv.getFloat32(i,false));return out;}
+function parseAsync(did,cid,data){if(did===0x18&&cid===0x02){if(data.length>=12&&data.length%4===0){const v=parseFloat32List(data);$('imuPitch').textContent=(v[0]||0).toFixed(1)+'°';$('imuRoll').textContent=(v[1]||0).toFixed(1)+'°';$('imuYaw').textContent=(v[2]||0).toFixed(1)+'°';}else if(data.length>=6){const dv=new DataView(new Uint8Array(data).buffer);$('imuPitch').textContent=dv.getInt16(0,false)+'°';$('imuRoll').textContent=dv.getInt16(2,false)+'°';$('imuYaw').textContent=dv.getInt16(4,false)+'°';}else log('Short IMU frame: '+bytesToHex(data),'warn');}else log('Async DID '+did.toString(16)+' CID '+cid.toString(16)+': '+bytesToHex(data));}
+function updateBattery(t){const el=$('batteryText');el.textContent='BATT: '+t;el.className='pill '+(/LOW|CRIT/i.test(t)?'bad':/%|OK|CHARG|V/i.test(t)?'good':'');}
+function driveFlags(){return($('reverseToggle').checked?1:0)|($('turboToggle').checked?2:0)|($('fastTurnToggle').checked?4:0)|($('driftToggle').checked?32:0);}
+function sendDrive(speed=currentSpeed,heading=currentHeading){currentSpeed=clamp(Math.round(speed),0,255);currentHeading=((Math.round(heading)%360)+360)%360;$('spdOut').textContent=currentSpeed;$('hdgOut').textContent=currentHeading+'°';$('headingArrow').style.transform='rotate('+currentHeading+'deg)';$('headingArrow').style.opacity=currentSpeed?1:.35;sendCmd(0x16,0x07,[currentSpeed,...toBytesU16(currentHeading),driveFlags()],'drive');}
+function emergencyStop(){currentSpeed=0;sendDrive(0,currentHeading);log('STOP sent.','warn');}
+function updateKeyboard(){if(isJoystickActive)return;let x=0,y=0;if(keys.up)y-=1;if(keys.down)y+=1;if(keys.left)x-=1;if(keys.right)x+=1;let speed=(x||y)?+$('speedMax').value:0,hdg=currentHeading;if(speed){hdg=Math.atan2(y,x)*180/Math.PI+90;if(hdg<0)hdg+=360;}if(speed!==lastSpeed||Math.abs(hdg-lastHeading)>1){lastSpeed=speed;lastHeading=hdg;sendDrive(speed,hdg);}}
+$('stopBtn').onclick=emergencyStop;$('resetYawBtn').onclick=()=>sendCmd(0x16,0x06,[],'reset yaw');$('speedMax').oninput=e=>{$('speedLabel').textContent=e.target.value;updateKeyboard();};['reverseToggle','turboToggle','fastTurnToggle','driftToggle'].forEach(id=>$(id).onchange=()=>{document.body.classList.toggle('reverse',$('reverseToggle').checked);if(currentSpeed)sendDrive(currentSpeed,currentHeading);});
+const area=$('joystickArea'),nub=$('joystickNub');function handleMove(e){if(!isJoystickActive)return;e.preventDefault();const r=area.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,pt=e.touches?e.touches[0]:e,dx=pt.clientX-cx,dy=pt.clientY-cy,rad=r.width/2,dist=Math.hypot(dx,dy),ang=Math.atan2(dy,dx),limited=Math.min(dist,rad-6);nub.style.transform='translate('+Math.cos(ang)*limited+'px,'+Math.sin(ang)*limited+'px)';const dz=rad*.25;let speed=dist<dz?0:Math.round(Math.pow(Math.min(1,(dist-dz)/(rad-dz)),2.4)*+$('speedMax').value),hdg=ang*180/Math.PI+90;if(hdg<0)hdg+=360;if(Math.abs(speed-lastSpeed)>3||Math.abs(hdg-lastHeading)>5){lastSpeed=speed;lastHeading=hdg;sendDrive(speed,hdg);}}
+function endJoy(){if(!isJoystickActive)return;isJoystickActive=false;nub.style.transform='translate(0,0)';sendDrive(0,currentHeading);}area.onmousedown=e=>{isJoystickActive=true;handleMove(e);};window.onmousemove=handleMove;window.onmouseup=endJoy;area.addEventListener('touchstart',e=>{isJoystickActive=true;handleMove(e);},{passive:false});window.addEventListener('touchmove',handleMove,{passive:false});window.addEventListener('touchend',endJoy);
+window.addEventListener('keydown',e=>{if(e.repeat||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return;if(e.key==='Shift'){$('reverseToggle').checked=true;$('reverseToggle').dispatchEvent(new Event('change'));}if(['w','ArrowUp'].includes(e.key)){keys.up=true;$('key-w').classList.add('active');}if(['a','ArrowLeft'].includes(e.key)){keys.left=true;$('key-a').classList.add('active');}if(['s','ArrowDown'].includes(e.key)){keys.down=true;$('key-s').classList.add('active');}if(['d','ArrowRight'].includes(e.key)){keys.right=true;$('key-d').classList.add('active');}if(e.code==='Space'){e.preventDefault();emergencyStop();}updateKeyboard();});
+window.addEventListener('keyup',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return;if(e.key==='Shift'){$('reverseToggle').checked=false;$('reverseToggle').dispatchEvent(new Event('change'));}if(['w','ArrowUp'].includes(e.key)){keys.up=false;$('key-w').classList.remove('active');}if(['a','ArrowLeft'].includes(e.key)){keys.left=false;$('key-a').classList.remove('active');}if(['s','ArrowDown'].includes(e.key)){keys.down=false;$('key-s').classList.remove('active');}if(['d','ArrowRight'].includes(e.key)){keys.right=false;$('key-d').classList.remove('active');}updateKeyboard();});
+function setLegAction(n){sendCmd(0x17,0x0D,[n],['leg stop','three-leg','two-leg','waddle'][n]||'leg');}
+$('headSlider').oninput=e=>{$('headVal').textContent=e.target.value+'°';sendCmd(0x17,0x0F,float32Bytes(e.target.value),'set head');};$('headCenterBtn').onclick=()=>{$('headSlider').value=0;$('headSlider').dispatchEvent(new Event('input'));};$('getHeadBtn').onclick=()=>sendCmd(0x17,0x14,[],'get head');$('legPosSlider').oninput=e=>{$('legPosVal').textContent=(+e.target.value).toFixed(2);sendCmd(0x17,0x15,float32Bytes(e.target.value),'set leg');};$('getLegPosBtn').onclick=()=>sendCmd(0x17,0x16,[],'get leg');
+function applyAllLights(){sendCmd(0x1A,0x0E,[0,7,...colorBytes($('ledFront').value)],'front LEDs');sendCmd(0x1A,0x0E,[0,0x70,...colorBytes($('ledRear').value)],'rear LEDs');sendCmd(0x1A,0x0E,[0,8,+$('logicInt').value],'logic');sendCmd(0x1A,0x0E,[0,0x80,+$('holoInt').value],'holo');}
+function lightsOff(){sendCmd(0x1A,0x0E,[0,7,0,0,0],'front off');sendCmd(0x1A,0x0E,[0,0x70,0,0,0],'rear off');sendCmd(0x1A,0x0E,[0,8,0],'logic off');sendCmd(0x1A,0x0E,[0,0x80,0],'holo off');}
+let ledTimer=null;['ledFront','ledRear','logicInt','holoInt'].forEach(id=>$(id).oninput=e=>{if(id==='logicInt')$('logicVal').textContent=e.target.value;if(id==='holoInt')$('holoVal').textContent=e.target.value;clearTimeout(ledTimer);ledTimer=setTimeout(applyAllLights,60);});$('ledApplyBtn').onclick=applyAllLights;$('ledOffBtn').onclick=lightsOff;$('idleLedBtn').onclick=()=>sendCmd(0x1A,0x19,[],'idle LEDs');
+function updateVolume(v){$('volLabel').textContent=Math.round(+v/255*100)+'%';sendCmd(0x1A,0x08,[+v],'volume');}function playSound(id){sendCmd(0x1A,0x07,[...toBytesU16(+id),0],'sound '+id);}function stopAudio(){sendCmd(0x1A,0x0A,[],'stop audio');}
+$('masterVolume').oninput=e=>updateVolume(e.target.value);$('playSoundBtn').onclick=()=>playSound($('soundSelect').value);$('playSoundIdBtn').onclick=()=>playSound($('soundId').value);$('stopAudioBtn').onclick=stopAudio;
+function playAnimation(id){sendCmd(0x17,0x05,toBytesU16(+id),'animation '+id);}function stopAnimation(){sendCmd(0x17,0x2B,[],'stop animation');}
+$('playAnimBtn').onclick=()=>playAnimation($('animSelect').value);$('stopAnimBtn').onclick=stopAnimation;$('idleOnBtn').onclick=()=>sendCmd(0x17,0x2C,[1],'idle on');$('idleOffBtn').onclick=()=>sendCmd(0x17,0x2C,[0],'idle off');$('trophyBtn').onclick=()=>{trophyEnabled=!trophyEnabled;sendCmd(0x17,0x2D,[trophyEnabled?1:0],'trophy '+trophyEnabled);};
+function requestBattery(){sendCmd(0x13,0x04,[],'battery state');sendCmd(0x13,0x10,[],'battery percent');}
+$('batteryBtn').onclick=requestBattery;$('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');$('wakeBtn').onclick=()=>sendCmd(0x13,0x0D,[],'wake');$('imuBtn').onclick=()=>{imuEnabled=!imuEnabled;if(imuEnabled){sendCmd(0x18,0x00,[0,250,0,0,7,0,0],'IMU stream on');log('IMU requested; if values stay 0, drive/spin briefly then try again.');}else{sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'IMU off');$('imuPitch').textContent='0°';$('imuRoll').textContent='0°';$('imuYaw').textContent='0°';}};
+$('stabBtn').onclick=()=>sendCmd(0x16,0x0C,[1],'stabilization');$('sleepBtn').onclick=()=>sendCmd(0x13,0x01,[0,0,0,0,0],'sleep');$('rawAllOffBtn').onclick=()=>{for(let i=0;i<4;i++)sendCmd(0x16,0x0B,[i,0,0,0],'raw off');};$('rawCmdBtn').onclick=()=>{const a=parseHex($('rawCmd').value);if(a.length<2){log('Raw command needs DID CID [DATA...]','bad');return;}sendCmd(a[0],a[1],a.slice(2),'raw user');};
+const anims=[['CHARGER 1',0],['EMOTE ALARM',7],['EMOTE ANGRY',8],['EMOTE DRIVE',11],['EMOTE EXCITED',12],['EMOTE LAUGH',15],['EMOTE NO',16],['EMOTE YES',21],['EMOTE SCAN',22],['IDLE 1',25],['WWM HAPPY',40],['WWM LAUGH',42],['WWM SAD',47],['MOTOR',55]];
+const sounds=[['R2 CHATTY 1',1950],['R2 POSITIVE 1',3302],['R2 NEGATIVE 1',3101],['R2 EXCITED 1',2600],['R2 SCREAM',3797],['R2 HEAD SPIN',2797],['R2 ENGAGE HYPER DRIVE',2586],['R2 FALL',1609],['BB8 POSITIVE 1',1077],['BB8 NEGATIVE 1',787],['BB9E POSITIVE 1',1531],['R2Q5 SHUTDOWN',3929]];
+function fillSelect(sel,rows){sel.innerHTML='';rows.forEach(([name,id])=>{const o=document.createElement('option');o.value=id;o.textContent=name+' · '+id;sel.appendChild(o);});}
+fillSelect($('animSelect'),anims);fillSelect($('soundSelect'),sounds);setInterval(()=>{if(isConnected&&currentSpeed>0)sendDrive(currentSpeed,currentHeading);},500);setInterval(()=>{if(isConnected)requestBattery();},30000);window.addEventListener('error',e=>{status('SCRIPT ERROR: '+e.message,'bad');log('SCRIPT ERROR line '+e.lineno+': '+e.message,'bad');});status('ready. script loaded.','good');log('Boot OK. If Connect opens the chooser, JavaScript is healthy.');
+</script>
+</body>
+</html>
