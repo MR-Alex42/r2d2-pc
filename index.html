@@ -925,8 +925,19 @@
     }
 
     function buildRequestOptions() {
-      // Bluetooth discovery intentionally mirrors the uploaded working implementation:
-      // broad chooser + optional services. Name/service filters can hide R2-D2 on some hosts.
       return {
         acceptAllDevices: true,
-        optionalServices: [UUIDS.mainService, UUIDS.conne
+        optionalServices: [UUIDS.mainService, UUIDS.connectService, "battery_service"]
+      };
+    }
+
+    async function preflightBluetooth() {
+      log(`Origin: ${location.origin}`);
+      log(`Secure context: ${window.isSecureContext ? "yes" : "NO"}`);
+      log(`Web Bluetooth API: ${navigator.bluetooth ? "available" : "MISSING"}`);
+
+      if (!window.isSecureContext) {
+        throw new Error("Web Bluetooth requires HTTPS or localhost. Run this from localhost or HTTPS, not file://.");
+      }
+      if (!navigator.bluetooth) {
+        t
