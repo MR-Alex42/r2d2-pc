@@ -340,20 +340,33 @@ $('idleOnBtn').onclick=()=>sendCmd(0x17,0x2C,[1],'idle animations on'); $('idleO
 $('trophyBtn').onclick=()=>{ trophyEnabled=!trophyEnabled; sendCmd(0x17,0x2D,[trophyEnabled?1:0],'trophy '+trophyEnabled); };
 
 function requestBattery(){ sendCmd(0x13,0x04,[],'battery state'); sendCmd(0x13,0x10,[],'battery percent'); }
-$('batteryBtn').onclick=requestBattery; $('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');
+$('batteryBtn').onclick=requestBattery;
+$('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');
+
 $('imuBtn').onclick=()=>{
   imuEnabled=!imuEnabled;
   if(imuEnabled) {
-    // Sensor DID 0x18 / CID 0x00: interval u16, count u8, mask u32.
-    // Mask 0x00070000 = attitude pitch/roll/yaw on BB-9E/R2-D2-family toys.
-    sendCmd(0x18,0x00,[0x00,0xFA,0x00,0x00,0x07,0x00,0x00],'IMU attitude stream
+    // Keep the original working BLE connection flow unchanged.
+    // Sensor DID 0x18 / CID 0x00 payload: interval u16, count u8, mask u32.
+    // 0x00070000 = attitude pitch/roll/yaw.
+    sendCmd(0x18,0x00,[0x00,0xFA,0x00,0x00,0x07,0x00,0x00],'IMU attitude stream on');
+    log('IMU stream requested: attitude pitch/roll/yaw every 250ms.');
+  } else {
+    sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'IMU off');
+    $('imuPitch').textContent='0°';
+    $('imuRoll').textContent='0°';
+    $('imuYaw').textContent='0°';
+    log('IMU stream stopped.');
+  }
+};
+
 $('collisionBtn').onclick=()=>{ collisionEnabled=!collisionEnabled; if(collisionEnabled){ sendCmd(0x18,0x11,[1,80,80,40,40,80],'configure collision'); sendCmd(0x18,0x14,[1],'collision on'); } else sendCmd(0x18,0x14,[0],'collision off'); };
 $('stabBtn').onclick=()=>sendCmd(0x16,0x0C,[+$('stabSelect').value],'stabilization');
 $('rawSendBtn').onclick=()=>sendCmd(0x16,0x0B,[+$('rawIndex').value,+$('rawMode').value,0,+$('rawSpeed').value],'raw motor');
 $('rawAllOffBtn').onclick=()=>{ for(let i=0;i<4;i++) sendCmd(0x16,0x0B,[i,0,0,0],'raw off'); };
 $('sleepBtn').onclick=()=>sendCmd(0x13,0x01,[],'sleep');
 $('rawCmdBtn').onclick=()=>{ const a=parseHex($('rawCmd').value); if(a.length<2){log('Raw command needs DID CID [DATA...]','bad');return;} sendCmd(a[0],a[1],a.slice(2),'raw user'); };
-$('clearLogBtn').onclick=()=>logEl.innerHTML='';
+$('clearLogBtn').onclick=()=
 
 const ANIMS = `
 CHARGER_1,0
@@ -722,20 +735,4 @@ R2_NEGATIVE_3,3251
 R2_NEGATIVE_4,3258
 R2_NEGATIVE_5,3263
 R2_NEGATIVE_6,3268
-R2_NEGATIVE_7,3274
-R2_NEGATIVE_8,3282
-R2_NEGATIVE_9,3291
-R2_POSITIVE_1,3302
-R2_POSITIVE_10,3309
-R2_POSITIVE_11,3318
-R2_POSITIVE_12,3326
-R2_POSITIVE_13,3340
-R2_POSITIVE_14,3353
-R2_POSITIVE_15,3358
-R2_POSITIVE_16,3364
-R2_POSITIVE_17,3369
-R2_POSITIVE_18,3375
-R2_POSITIVE_19,3388
-R2_POSITIVE_2,3394
-R2_POSITIVE_20,3403
-R2
+R2_NEGATIVE_7
