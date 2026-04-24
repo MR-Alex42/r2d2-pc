@@ -45,7 +45,24 @@ function colorBytes(hex){return[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3
 function escapeBytes(payload){const out=[];for(const b of payload){if(b===0x8D)out.push(0xAB,0x05);else if(b===0xD8)out.push(0xAB,0x50);else if(b===0xAB)out.push(0xAB,0x23);else out.push(b)}return out}
 function unescapeBytes(frame){const out=[];for(let i=1;i<frame.length-1;i++){if(frame[i]===0xAB){i++;if(frame[i]===0x23)out.push(0xAB);else if(frame[i]===0x05)out.push(0x8D);else if(frame[i]===0x50)out.push(0xD8)}else out.push(frame[i])}return out}
 async function processQueue(){if(isWriting||!isConnected||!controlChar||!packetQueue.length)return;isWriting=true;const packet=packetQueue.shift();try{await controlChar.writeValueWithoutResponse(packet)}catch(e){log('BLE write failed: '+e.message,'bad')}isWriting=false;if(packetQueue.length)setTimeout(processQueue,18)}
-function sendCmd(did,cid,data=[],label=''){if(!isConnected||!controlChar)return null;const flags=0x0A,seq=seqNum&255;seqNum=(seqNum+1)&255;pendingRequests.set(seq,{did,cid,label,t:Date.now()});let sum=flags+did+cid+seq;data.forEach(b=>sum+=b);const payload=[flags,did,cid,seq,...data,(~sum)&255];packetQueue.push(new Uint8Array([0x8D,...escapeBytes(payload),0xD8]));processQueue();return seq}
+function enqueuePacket(flags,did,cid,seq,data=[],label='',track=true){
+  if(!isConnected||!controlChar)return null;
+  if(track)pendingRequests.set(seq,{did,cid,label,t:Date.now()});
+  let sum=flags+did+cid+seq;data.forEach(b=>sum+=b);
+  const payload=[flags,did,cid,seq,...data,(~sum)&255];
+  packetQueue.push(new Uint8Array([0x8D,...escapeBytes(payload),0xD8]));
+  processQueue();
+  return seq;
+}
+function sendCmd(did,cid,data=[],label=''){
+  const seq=seqNum&255;seqNum=(seqNum+1)&255;
+  return enqueuePacket(0x0A,did,cid,seq,data,label,true);
+}
+function sendCmdNoResponse(did,cid,data=[],label=''){
+  const seq=seqNum&255;seqNum=(seqNum+1)&255;
+  log('TX no-response '+label+' DID 0x'+did.toString(16)+' CID 0x'+cid.toString(16)+' data '+bytesToHex(data));
+  return enqueuePacket(0x08,did,cid,seq,data,label,false);
+}
 $('connectBtn').addEventListener('click',async()=>{try{if(!navigator.bluetooth)throw new Error('Web Bluetooth unavailable in this browser/context.');status('scanning...','warn');bluetoothDevice=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[API_V2_SERVICE,ANTI_DOS_SERVICE,'battery_service']});bluetoothDevice.addEventListener('gattserverdisconnected',onDisconnected);const server=await bluetoothDevice.gatt.connect();status('anti-DOS handshake...','warn');const anti=await server.getPrimaryService(ANTI_DOS_SERVICE);const antiChar=await anti.getCharacteristic(ANTI_DOS_CHARACTERISTIC);await antiChar.writeValueWithResponse(new TextEncoder().encode('usetheforce...band'));const api=await server.getPrimaryService(API_V2_SERVICE);controlChar=await api.getCharacteristic(API_V2_CHARACTERISTIC);try{notifyChar=await api.getCharacteristic(API_V2_NOTIFY_CHARACTERISTIC);await notifyChar.startNotifications();notifyChar.addEventListener('characteristicvaluechanged',handleResponse);log('API notifications enabled.')}catch(e){log('API notify unavailable: '+e.message,'warn')}try{const bs=await server.getPrimaryService('battery_service');const bc=await bs.getCharacteristic('battery_level');const v=await bc.readValue();updateBattery(v.getUint8(0)+'%');await bc.startNotifications();bc.addEventListener('characteristicvaluechanged',e=>updateBattery(e.target.value.getUint8(0)+'%'))}catch(e){log('Standard battery service unavailable; using Sphero battery commands.')}isConnected=true;setOnline(true);status('LINK ONLINE','good');log('Connected to '+(bluetoothDevice.name||'Sphero droid'));sendCmd(0x13,0x0D,[],'wake');await sleep(300);applyAllLights();updateVolume($('masterVolume').value);requestBattery()}catch(e){status('error: '+e.message,'bad');log('Connect error: '+e.message,'bad')}});
 $('disconnectBtn').onclick=async()=>{try{if(isConnected){emergencyStop();lightsOff();stopAudio();stopAnimation();await sleep(150);sendCmd(0x13,0x01,[0,0,0,0,0],'sleep');await sleep(300)}if(bluetoothDevice?.gatt?.connected)await bluetoothDevice.gatt.disconnect()}catch(e){log('Disconnect error: '+e.message,'bad')}finally{onDisconnected()}};
 function onDisconnected(){isConnected=false;controlChar=null;notifyChar=null;packetQueue=[];pendingRequests.clear();setOnline(false);status('OFFLINE','bad');updateBattery('--');imuEnabled=false;log('Disconnected.')}
@@ -88,6 +105,8 @@ function parseResponse(req,data){
   else if(req.did===0x17&&req.cid===0x14&&data.length>=4){const v=view.getFloat32(0,false);$('headOut').textContent=v.toFixed(1)+'°'}
   else if(req.did===0x17&&req.cid===0x16&&data.length>=4){const v=view.getFloat32(0,false);$('legPosVal').textContent=v.toFixed(2);$('legPosSlider').value=clamp(v,0,1)}
   else if(req.did===0x18&&req.cid===0x01&&data.length>=7){const interval=(data[0]<<8)|data[1],count=data[2],mask=(((data[3]<<24)>>>0)|(data[4]<<16)|(data[5]<<8)|data[6])>>>0;log('IMU mask confirmed: interval='+interval+'ms count='+count+' mask=0x'+mask.toString(16).padStart(8,'0'),'good')}
+  else if(req.did===0x18&&req.cid===0x0D&&data.length>=4){const mask=(((data[0]<<24)>>>0)|(data[1]<<16)|(data[2]<<8)|data[3])>>>0;log('Extended sensor mask confirmed: 0x'+mask.toString(16).padStart(8,'0'),'good')}
+  else if(req.did===0x17&&(req.label||'').includes('get trophy'))log('Trophy status response: '+(data.length?bytesToHex(data):'empty response'),'good')
   else if(req.label)log('OK '+req.label+(data.length?': '+bytesToHex(data):''))
 }
 function parseFloat32List(data){const dv=new DataView(new Uint8Array(data).buffer);const out=[];for(let i=0;i+3<data.length;i+=4)out.push(dv.getFloat32(i,false));return out}
@@ -121,7 +140,11 @@ function scanForImuFrame(body){
 }
 function parseAsync(did,cid,data){
   if(did===0x18&&cid===0x02){
-    if(!parseImuPayload(data,'async'))log('IMU frame found but payload shape was unexpected: '+bytesToHex(data),'warn');
+    if(!parseImuPayload(data,'legacy stream'))log('IMU frame found but payload shape was unexpected: '+bytesToHex(data),'warn');
+  }else if(did===0x18&&cid===0x3D){
+    log('Streaming service frame: '+bytesToHex(data));
+    // Token is usually first byte, then packed service data. Try to decode any float triples that appear after it.
+    if(data.length>4)parseImuPayload(data.slice(1),'streaming service');
   }else log('Async DID '+did.toString(16)+' CID '+cid.toString(16)+': '+bytesToHex(data))
 }
 function updateBattery(t){const el=$('batteryText');el.textContent='BATT: '+t;el.className='pill '+(/LOW|CRIT/i.test(t)?'bad':/%|OK|CHARG|V/i.test(t)?'good':'')}
@@ -142,25 +165,70 @@ let ledTimer=null;['ledFront','ledRear','logicInt','holoInt'].forEach(id=>$(id).
 function updateVolume(v){$('volLabel').textContent=Math.round(+v/255*100)+'%';sendCmd(0x1A,0x08,[+v],'volume')}function playSound(id){sendCmd(0x1A,0x07,[...toBytesU16(+id),0],'sound '+id)}function stopAudio(){sendCmd(0x1A,0x0A,[],'stop audio')}
 $('masterVolume').oninput=e=>updateVolume(e.target.value);$('playSoundBtn').onclick=()=>playSound($('soundSelect').value);$('playSoundIdBtn').onclick=()=>playSound($('soundId').value);$('stopAudioBtn').onclick=stopAudio;
 function playAnimation(id){sendCmd(0x17,0x05,toBytesU16(+id),'animation '+id)}function stopAnimation(){sendCmd(0x17,0x2B,[],'stop animation')}
-$('playAnimBtn').onclick=()=>playAnimation($('animSelect').value);$('stopAnimBtn').onclick=stopAnimation;$('idleOnBtn').onclick=()=>sendCmd(0x17,0x2C,[1],'idle on');$('idleOffBtn').onclick=()=>sendCmd(0x17,0x2C,[0],'idle off');$('trophyBtn').onclick=()=>{trophyEnabled=!trophyEnabled;sendCmd(0x17,0x2D,[trophyEnabled?1:0],'trophy '+trophyEnabled)};
-function requestBattery(){sendCmd(0x13,0x04,[],'battery state');sendCmd(0x13,0x10,[],'battery percent')}
-$('batteryBtn').onclick=requestBattery;$('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');$('wakeBtn').onclick=()=>sendCmd(0x13,0x0D,[],'wake');$('imuBtn').onclick=()=>{
-  imuEnabled=!imuEnabled;
-  if(imuEnabled){
-    imuFrameCount=0;lastImuFrameAt=0;lastNotifyLogAt=0;
-    // Sphero v2 Sensor.set_sensor_streaming_mask: interval u16, count u8, mask u32.
-    // R2-D2/BB-9E attitude mask: pitch 0x40000 + roll 0x20000 + yaw 0x10000 = 0x00070000.
-    sendCmd(0x13,0x0D,[],'wake before IMU');
-    sendCmd(0x18,0x00,[0x00,0xFA,0x00,0x00,0x07,0x00,0x00],'IMU stream on');
-    setTimeout(()=>sendCmd(0x18,0x01,[],'get IMU mask'),250);
-    setTimeout(()=>{if(imuEnabled&&imuFrameCount===0)log('No IMU frames yet. If Notify RX appears, parser will auto-scan; if not, the droid is not sending sensor notifications.','warn')},1800);
-    log('IMU requested: mask 0x00070000 every 250ms. Move/tilt R2-D2 to confirm values.');
+$('playAnimBtn').onclick=()=>playAnimation($('animSelect').value);$('stopAnimBtn').onclick=stopAnimation;
+$('idleOnBtn').onclick=()=>sendCmd(0x17,0x2C,[1],'idle on');
+$('idleOffBtn').onclick=()=>sendCmd(0x17,0x2C,[0],'idle off');
+function setTrophyMode(enable){
+  trophyEnabled=!!enable;
+  // Keep the documented Animatronic trophy command path, then request status.
+  sendCmd(0x17,0x2D,[trophyEnabled?1:0],'trophy '+trophyEnabled);
+  setTimeout(()=>sendCmd(0x17,0x2E,[],'get trophy status'),180);
+  // Visible confirmation: trophy/display mode can be silent, so also trigger idle visuals/routine.
+  if(trophyEnabled){
+    sendCmd(0x17,0x2C,[1],'idle animations on for trophy');
+    sendCmd(0x1A,0x19,[],'idle LED animation for trophy');
+    setTimeout(()=>playAnimation(25),220);
+    log('Trophy ON requested; also played IDLE 1 as visible confirmation.');
   }else{
-    sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'IMU off');
-    $('imuPitch').textContent='0°';$('imuRoll').textContent='0°';$('imuYaw').textContent='0°';
-    log('IMU stopped.');
+    sendCmd(0x17,0x2C,[0],'idle animations off for trophy');
+    log('Trophy OFF requested.');
   }
-};
+}
+$('trophyBtn').onclick=()=>setTrophyMode(!trophyEnabled);
+function requestBattery(){sendCmd(0x13,0x04,[],'battery state');sendCmd(0x13,0x10,[],'battery percent')}
+$('batteryBtn').onclick=requestBattery;$('voltageBtn').onclick=()=>sendCmd(0x13,0x03,[],'battery voltage');$('wakeBtn').onclick=()=>sendCmd(0x13,0x0D,[],'wake');
+let imuRetryTimer=null;
+function setSensorMask(mask,label,interval=100){
+  const data=[(interval>>8)&255,interval&255,0,(mask>>>24)&255,(mask>>>16)&255,(mask>>>8)&255,mask&255];
+  sendCmd(0x18,0x00,data,label+' response');
+  setTimeout(()=>sendCmdNoResponse(0x18,0x00,data,label+' fire'),60);
+}
+function stopAllSensorStreams(){
+  sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'legacy IMU off');
+  sendCmd(0x18,0x0C,[0,0,0,0],'extended IMU off');
+  sendCmd(0x18,0x3B,[],'streaming service stop');
+  sendCmd(0x18,0x3C,[],'streaming service clear');
+}
+function startImuStreaming(){
+  imuEnabled=true;imuFrameCount=0;lastImuFrameAt=0;lastNotifyLogAt=0;
+  clearTimeout(imuRetryTimer);
+  sendCmd(0x13,0x0D,[],'wake before IMU');
+  stopAllSensorStreams();
+  setTimeout(()=>{
+    // 0x00070000 = attitude pitch/roll/yaw. Add accel-one/core-time to make some firmwares actually emit frames.
+    setSensorMask(0x00070202,'IMU attitude+accelOne+time',100);
+    // Extended gyro mask documented on R2-D2/BB-9E: x/y/z = 0x03800000.
+    sendCmd(0x18,0x0C,[0x03,0x80,0x00,0x00],'extended gyro mask');
+    setTimeout(()=>sendCmd(0x18,0x01,[],'get IMU mask'),250);
+    setTimeout(()=>sendCmd(0x18,0x0D,[],'get extended mask'),320);
+  },180);
+  imuRetryTimer=setTimeout(()=>{
+    if(!imuEnabled||imuFrameCount>0)return;
+    log('No attitude frames yet; retrying with accelerometer-only mask 0x0000E000.','warn');
+    setSensorMask(0x0000E000,'IMU accel fallback',100);
+  },2200);
+  imuRetryTimer=setTimeout(()=>{
+    if(!imuEnabled||imuFrameCount>0)return;
+    log('Still no sensor frames. BLE notifications work only if Notify RX appears; if none appears, firmware is accepting commands but not emitting sensor async packets.','warn');
+  },4500);
+  log('IMU requested with attitude mask, extended gyro mask, and retry fallback. Watch for Notify RX or IMU frame #1.');
+}
+function stopImuStreaming(){
+  imuEnabled=false;clearTimeout(imuRetryTimer);stopAllSensorStreams();
+  $('imuPitch').textContent='0°';$('imuRoll').textContent='0°';$('imuYaw').textContent='0°';
+  log('IMU stopped and stream masks cleared.');
+}
+$('imuBtn').onclick=()=>{if(imuEnabled)stopImuStreaming();else startImuStreaming();};
 $('stabBtn').onclick=()=>sendCmd(0x16,0x0C,[1],'stabilization');$('sleepBtn').onclick=()=>sendCmd(0x13,0x01,[0,0,0,0,0],'sleep');$('rawAllOffBtn').onclick=()=>{for(let i=0;i<4;i++)sendCmd(0x16,0x0B,[i,0,0,0],'raw off')};$('rawCmdBtn').onclick=()=>{const a=parseHex($('rawCmd').value);if(a.length<2){log('Raw command needs DID CID [DATA...]','bad');return}sendCmd(a[0],a[1],a.slice(2),'raw user')};
 const anims=[['CHARGER 1',0],['CHARGER 2',1],['EMOTE ALARM',7],['EMOTE ANGRY',8],['EMOTE DRIVE',11],['EMOTE EXCITED',12],['EMOTE LAUGH',15],['EMOTE NO',16],['EMOTE YES',21],['EMOTE SCAN',22],['IDLE 1',25],['IDLE 2',26],['WWM HAPPY',40],['WWM LAUGH',42],['WWM SAD',47],['MOTOR',55]];
 const sounds=[['R2 CHATTY 1',1950],['R2 POSITIVE 1',3302],['R2 NEGATIVE 1',3101],['R2 EXCITED 1',2600],['R2 SCREAM',3797],['R2 HEAD SPIN',2797],['R2 ENGAGE HYPER DRIVE',2586],['R2 FALL',1609],['BB8 POSITIVE 1',1077],['BB8 NEGATIVE 1',787],['BB9E POSITIVE 1',1531],['BB9E EXTRA 1',3941],['R2Q5 SHUTDOWN',3929]];
