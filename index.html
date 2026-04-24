@@ -275,13 +275,14 @@ function setImuDisplayState(state,cls=''){
 }
 function setSensorMask(mask,label,interval=250){
   const data=[(interval>>8)&255,interval&255,0,(mask>>>24)&255,(mask>>>16)&255,(mask>>>8)&255,mask&255];
-  // This toy streams reliably from the no-response v2 sensor command; avoid duplicate response/no-response writes.
-  sendCmdNoResponse(0x18,0x00,data,label);
+  // Your working log showed the stream starts when the response-form mask is sent first,
+  // followed by the no-response duplicate. Keep both, but separate them enough to avoid GATT busy.
+  sendCmd(0x18,0x00,data,label+' response');
+  setTimeout(()=>sendCmdNoResponse(0x18,0x00,data,label+' fire'),220);
 }
 function stopAllSensorStreams(){
-  // Keep this conservative: some R2-D2 firmware ignores unsupported streaming-service commands.
-  sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'legacy IMU off');
-  sendCmd(0x18,0x0C,[0,0,0,0],'extended IMU off');
+  // Stop only the proven legacy mask path. Avoid extra unsupported commands before starting a stream.
+  sendCmd(0x18,0x00,[0,0,0,0,0,0,0],'IMU off');
 }
 function enableActivityDiagnostics(){
   // Disabled by default for the demo build. Extra diagnostic commands caused GATT-busy noise.
@@ -292,16 +293,16 @@ function startImuStreaming(){
   $('imuPitch').textContent='…';$('imuRoll').textContent='…';$('imuYaw').textContent='…';
   setImuDisplayState('Probing','warn');
   sendCmd(0x13,0x0D,[],'wake before IMU');
-  stopAllSensorStreams();
+  // Do not clear the sensor stream right before starting unless one was already active;
+  // some firmware appears to ignore the immediate restart after a clear.
   setTimeout(()=>{
     // Official v2 stream mask path: attitude pitch/roll/yaw = 0x00070000.
-    // Keep this minimal; the stream is proven to arrive from this no-response command.
     setSensorMask(0x00070000,'IMU attitude v2',250);
-  },300);
+  },350);
   imuRetryTimer=setTimeout(()=>{
     if(!imuEnabled||imuFrameCount>0)return;
     setImuDisplayState('Retrying','warn');
-    log('No IMU frame yet; retrying attitude mask once.','warn');
+    log('No IMU frame yet; retrying exact working two-step attitude mask.','warn');
     setSensorMask(0x00070000,'IMU attitude retry',250);
   },2600);
   imuUnsupportedTimer=setTimeout(()=>{
