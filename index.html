@@ -17,7 +17,7 @@
 <section><div class="title">Optics <span class="hint">R2 LEDs</span></div><div class="grid2"><div><label>Front RGB</label><input type="color" id="ledFront" value="#00aaff"></div><div><label>Rear RGB</label><input type="color" id="ledRear" value="#ff0000"></div><div><label>Logic <span id="logicVal">255</span></label><input type="range" id="logicInt" min="0" max="255" value="255"></div><div><label>Holo <span id="holoVal">0</span></label><input type="range" id="holoInt" min="0" max="255" value="0"></div></div><div class="grid3" style="margin-top:6px"><button class="btn ghost" id="ledApplyBtn">Apply</button><button class="btn ghost" id="idleLedBtn">Idle LEDs</button><button class="btn red" id="ledOffBtn">Off</button></div></section>
 <section><div class="title">Audio <span class="hint">all IDs via raw field</span></div><div class="grid2"><select id="soundSelect"></select><input id="soundId" type="number" min="0" max="65535" value="1950" title="Any Sphero sound ID"></div><div class="grid3" style="margin-top:5px"><button class="btn pink" id="playSoundBtn">Play List</button><button class="btn pink" id="playSoundIdBtn">Play ID</button><button class="btn red" id="stopAudioBtn">Stop</button></div><div style="margin-top:5px"><label>Volume <span id="volLabel">50%</span></label><input id="masterVolume" type="range" min="0" max="255" value="128"></div></section>
 <section><div class="title">Routines <span class="hint">animations</span></div><div class="row"><select id="animSelect" class="grow"></select><button class="btn blue" id="playAnimBtn">Play</button><button class="btn red" id="stopAnimBtn">Stop</button></div><div class="grid3" style="margin-top:6px"><button class="btn ghost" id="idleOnBtn">Idle On</button><button class="btn ghost" id="idleOffBtn">Idle Off</button><button class="btn ghost" id="trophyBtn">Trophy</button></div></section>
-<section><div class="title">Telemetry <span class="hint" id="telemetryHint">battery + IMU probe</span></div><div class="grid4"><button class="btn ghost" id="imuBtn">IMU Probe</button><button class="btn ghost" id="batteryBtn">Battery</button><button class="btn ghost" id="voltageBtn">Voltage</button><button class="btn ghost" id="wakeBtn">Wake</button></div><div class="grid4" style="margin-top:6px"><div class="metric">Pitch<b id="imuPitch">0°</b></div><div class="metric">Roll<b id="imuRoll">0°</b></div><div class="metric">Yaw<b id="imuYaw">0°</b></div><div class="metric">State<b id="imuState">Idle</b></div></div></section>
+<section><div class="title">Telemetry <span class="hint" id="telemetryHint">battery + IMU stream</span></div><div class="grid4"><button class="btn ghost" id="imuBtn">IMU Stream</button><button class="btn ghost" id="batteryBtn">Battery</button><button class="btn ghost" id="voltageBtn">Voltage</button><button class="btn ghost" id="wakeBtn">Wake</button></div><div class="grid4" style="margin-top:6px"><div class="metric">Pitch<b id="imuPitch">0°</b></div><div class="metric">Roll<b id="imuRoll">0°</b></div><div class="metric">Yaw<b id="imuYaw">0°</b></div><div class="metric">State<b id="imuState">Idle</b></div></div></section>
 <section><div class="title">Expert <span class="hint">raw/stabilization</span></div><div class="grid3"><button class="btn ghost" id="stabBtn">Stab</button><button class="btn red" id="rawAllOffBtn">Raw Off</button><button class="btn red" id="sleepBtn">Sleep</button></div><div class="row" style="margin-top:6px"><input id="rawCmd" class="grow" type="text" placeholder="DID CID DATA, ex: 1A 07 06 49 00"><button class="btn amber" id="rawCmdBtn">Send</button></div></section>
 <section class="span2"><div class="title">Event Log <span class="hint">Boot OK means JS loaded</span></div><div id="eventLog" class="log"></div></section>
 </main><footer class="tiny">Use Chrome/Edge. Save as .html or serve from HTTPS/localhost. STOP before lifting the droid.</footer></div>
@@ -33,9 +33,14 @@ const ANTI_DOS_CHARACTERISTIC='00020005'+SPHERO_UUID_BASE;
 let bluetoothDevice=null,controlChar=null,notifyChar=null,isConnected=false,seqNum=0,packetQueue=[],isWriting=false,pendingRequests=new Map();
 const notificationCharIds=new Set();
 let currentSpeed=0,currentHeading=0,lastSpeed=-1,lastHeading=-1,isJoystickActive=false,keys={up:false,down:false,left:false,right:false},imuEnabled=false,trophyEnabled=false;
-let imuFrameCount=0,lastImuFrameAt=0,lastNotifyLogAt=0;
+let imuFrameCount=0,lastImuFrameAt=0,lastNotifyLogAt=0,lastSensorActivityLogAt=0,imuWindowStart=0,imuWindowFrames=0;
 const $=id=>document.getElementById(id),clamp=(v,min,max)=>Math.max(min,Math.min(max,v)),sleep=ms=>new Promise(r=>setTimeout(r,ms)),logEl=$('eventLog');
-function log(msg,cls=''){const d=document.createElement('div');d.className=cls;d.textContent=new Date().toLocaleTimeString()+' · '+msg;logEl.prepend(d);while(logEl.children.length>80)logEl.lastChild.remove()}
+function log(msg,cls=''){
+  // Keep the boss-demo log readable: suppress low-value response noise while showing real IMU frames.
+  if(/^Short (response|async) packet/.test(msg))return;
+  if(/^ERR seq/.test(msg)&&!msg.includes('Connect')&&!msg.includes('IMU'))return;
+  const d=document.createElement('div');d.className=cls;d.textContent=new Date().toLocaleTimeString()+' · '+msg;logEl.prepend(d);while(logEl.children.length>80)logEl.lastChild.remove()
+}
 function status(msg,cls='warn'){$('statusText').textContent='STATUS: '+msg;$('statusText').className='status '+cls}
 function setOnline(on){document.body.classList.toggle('online',on);$('connectBtn').classList.toggle('hidden',on);$('disconnectBtn').classList.toggle('hidden',!on)}
 function bytesToHex(a){return Array.from(a).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ')}
@@ -172,20 +177,25 @@ function parseResponse(req,data){
 function parseFloat32List(data){const dv=new DataView(new Uint8Array(data).buffer);const out=[];for(let i=0;i+3<data.length;i+=4)out.push(dv.getFloat32(i,false));return out}
 function plausibleAngles(v){return v.length>=3&&v.slice(0,3).every(n=>Number.isFinite(n)&&Math.abs(n)<1000)}
 function updateImuFromValues(v,source){
-  imuFrameCount++;lastImuFrameAt=Date.now();
-  setImuDisplayState('Streaming #'+imuFrameCount,'good');
+  const now=Date.now();
+  imuFrameCount++;lastImuFrameAt=now;imuWindowFrames++;
+  clearTimeout(imuRetryTimer);clearTimeout(imuUnsupportedTimer);
+  if(!imuWindowStart)imuWindowStart=now;
+  const elapsed=Math.max(1,now-imuWindowStart);
+  const hz=(imuWindowFrames*1000/elapsed);
+  if(elapsed>3000){imuWindowStart=now;imuWindowFrames=0;}
+  setImuDisplayState((hz>=1?hz.toFixed(1)+'Hz':'Live')+' #'+imuFrameCount,'good');
   $('imuPitch').textContent=(v[0]||0).toFixed(1)+'°';
   $('imuRoll').textContent=(v[1]||0).toFixed(1)+'°';
   $('imuYaw').textContent=(v[2]||0).toFixed(1)+'°';
-  // Log the first few frames, then every 10th, so the demo visibly proves continuous streaming.
-  if(imuFrameCount<=5||imuFrameCount%10===0)log('IMU '+source+' frame #'+imuFrameCount+': '+v.slice(0,3).map(n=>n.toFixed(2)).join(', '),'good');
+  // Keep log readable but prove fast streaming at startup.
+  if(imuFrameCount<=8||imuFrameCount%25===0)log('IMU '+source+' frame #'+imuFrameCount+': '+v.slice(0,3).map(n=>n.toFixed(2)).join(', ')+' @ '+hz.toFixed(1)+'Hz','good');
 }
 function decodeR2ImuTokenFloats(data,source){
-  // R2-D2 observed packet payload: TOKEN + pitch f32 + roll f32 + yaw f32 + optional trailing bytes.
+  // R2-D2 observed packet payload: TOKEN/SEQ + pitch f32 + roll f32 + yaw f32 + optional trailing bytes.
+  // The token/sequence byte is not guaranteed to stay FF, so accept any first byte and validate by float plausibility.
   if(data.length<13)return false;
   const token=data[0];
-  const isLikelyToken=(token===0xFF||token===0x00||token===0x01||token===0x02||token===0x03||token===0xAA);
-  if(!isLikelyToken)return false;
   const v=parseFloat32List(data.slice(1,13));
   if(!plausibleAngles(v))return false;
   updateImuFromValues(v,source+' token 0x'+token.toString(16).padStart(2,'0'));
@@ -216,12 +226,9 @@ function scanForImuFrame(body){
       if(parseImuPayload(body.slice(i+2),'R2 IMU'))return true;
     }
   }
-  // Fallback: raw token + three float32s, but never decode from packet flags/DID/CID.
-  for(let i=3;i<body.length-13;i++){
-    const b=body[i];
-    if(b===0xFF||b===0x00||b===0x01||b===0x02||b===0x03||b===0xAA){
-      if(parseImuPayload(body.slice(i),'R2 raw IMU offset '+i))return true;
-    }
+  // Fallback: raw token/sequence + three float32s, but never decode from packet flags/DID/CID.
+  for(let i=3;i<=body.length-13;i++){
+    if(parseImuPayload(body.slice(i),'R2 raw IMU offset '+i))return true;
   }
   return false;
 }
@@ -231,7 +238,8 @@ function parseAsync(did,cid,data){
     if(!parseImuPayload(data,'R2 async'))log('IMU frame found but payload shape was unexpected: '+bytesToHex(data),'warn');
   }else if(did===0x18&&cid===0x1A){
     // Gyro/accelerometer activity notify; not the continuous attitude stream.
-    if(imuEnabled&&data.length)log('Sensor activity notify: '+bytesToHex(data));
+    // Throttle this so it does not bury the real IMU rows.
+    if(imuEnabled&&data.length){const now=Date.now();if(now-lastSensorActivityLogAt>15000){lastSensorActivityLogAt=now;log('Sensor activity notify active.')}}
   }else if(did===0x18&&cid===0x3D){
     log('Streaming service frame: '+bytesToHex(data));
     if(data.length>4)parseImuPayload(data.slice(1),'streaming service');
@@ -298,7 +306,7 @@ function enableActivityDiagnostics(){
   // Disabled by default for the demo build. Extra diagnostic commands caused GATT-busy noise.
 }
 function startImuStreaming(){
-  imuEnabled=true;imuFrameCount=0;lastImuFrameAt=0;lastNotifyLogAt=0;
+  imuEnabled=true;imuFrameCount=0;lastImuFrameAt=0;lastNotifyLogAt=0;lastSensorActivityLogAt=0;imuWindowStart=0;imuWindowFrames=0;
   clearTimeout(imuRetryTimer);clearTimeout(imuUnsupportedTimer);
   $('imuPitch').textContent='…';$('imuRoll').textContent='…';$('imuYaw').textContent='…';
   setImuDisplayState('Probing','warn');
@@ -307,20 +315,20 @@ function startImuStreaming(){
   // some firmware appears to ignore the immediate restart after a clear.
   setTimeout(()=>{
     // Official v2 stream mask path: attitude pitch/roll/yaw = 0x00070000.
-    setSensorMask(0x00070000,'IMU attitude v2',250);
+    setSensorMask(0x00070000,'IMU attitude v2',50);
   },350);
   imuRetryTimer=setTimeout(()=>{
     if(!imuEnabled||imuFrameCount>0)return;
     setImuDisplayState('Retrying','warn');
     log('No IMU frame yet; retrying exact working two-step attitude mask.','warn');
-    setSensorMask(0x00070000,'IMU attitude retry',250);
+    setSensorMask(0x00070000,'IMU attitude retry',50);
   },2600);
   imuUnsupportedTimer=setTimeout(()=>{
     if(!imuEnabled||imuFrameCount>0)return;
     setImuDisplayState('Waiting','warn');
     log('Still waiting for IMU frames. Leave probe on and tilt the droid; notification subscription is active.','warn');
   },6200);
-  log('IMU probe started. If the firmware supports streaming, you will see Notify RX and IMU frame #1.');
+  log('IMU stream starting at 50ms target interval. Tilt R2-D2; pitch/roll/yaw should update quickly.');
 }
 function stopImuStreaming(){
   imuEnabled=false;clearTimeout(imuRetryTimer);clearTimeout(imuUnsupportedTimer);stopAllSensorStreams();
