@@ -80,5 +80,6 @@ Because the program is implemented as a single static HTML file, it can be edite
 
 This is an experimental browser-based control console for hobbyist use. It is not an official Sphero or Star Wars product.
 
-```
-```
+## Licence
+
+This project is released under the MIT Licence. See [`LICENSE`](LICENSE) for details.
