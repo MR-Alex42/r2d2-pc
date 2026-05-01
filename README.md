@@ -2,7 +2,7 @@
 
 A single-file Web Bluetooth control console for an R2-D2 Sphero droid. The app provides a dark, dashboard-style browser interface for connecting to the droid, driving it, controlling lights and sounds, running onboard animations, reading device information, and streaming live sensor data.
 
-<img width="2705" height="1353" alt="image" src="https://github.com/user-attachments/assets/5248d76f-96d3-4ed2-9f53-f8cd16208715" />
+<img width="2718" height="1317" alt="image" src="https://github.com/user-attachments/assets/ef319e3b-1010-435e-9b3e-5e1dde67285c" />
 
 ## Features
 
